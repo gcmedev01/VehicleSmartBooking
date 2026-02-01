@@ -1,0 +1,30 @@
+﻿@model IEnumerable<VehicleBooking.Web.Domain.Entities.Driver>
+@using VehicleBooking.Web.Domain.Helpers
+
+<h2>Fleet (Dev)</h2>
+
+<table class="table table-sm table-bordered">
+    <thead>
+        <tr>
+            <th>Plate</th>
+            <th>VehicleType</th>
+            <th>Status</th>
+            <th>Driver</th>
+            <th>UserCode</th>
+            <th>Created</th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var d in Model)
+        {
+            <tr>
+                <td>@d.Vehicle?.PlateNo</td>
+                <td>@d.Vehicle?.VehicleType</td>
+                <td>@d.Vehicle?.Status</td>
+                <td>@d.User?.UsernameTH</td>
+                <td>@d.User?.UserCode</td>
+                <td>@d.CreatedAtUtc.ToThaiTimeString()</td>
+            </tr>
+        }
+    </tbody>
+</table>

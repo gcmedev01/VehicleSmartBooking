@@ -1,0 +1,88 @@
+﻿@using System.ComponentModel.DataAnnotations
+@model VehicleSmartBooking.Controllers.AdminController.CreateDriverVm
+
+@{
+    Layout = "_VehicleBookingLayout";
+    ViewData["Title"] = "Create Driver";
+    ViewData["ActiveNav"] = "AdminDrivers";
+
+    var vehicles = ViewBag.Vehicles as List<(int Id, string Text)> ?? new();
+}
+
+<div class="vb-page-head vb-page-hero mb-4">
+    <div class="vb-page-title">
+        <div class="vb-page-icon">🚘</div>
+        <div>
+            <h1 class="vb-page-h1">Create Driver</h1>
+            <div class="vb-page-sub">เพิ่มพนักงานขับรถ (สร้างบัญชี local) และผูกกับรถของบริษัท</div>
+        </div>
+    </div>
+</div>
+
+<div class="vb-card p-3 p-md-4">
+    <form asp-controller="Admin" asp-action="CreateDriver" method="post" novalidate>
+        @Html.AntiForgeryToken()
+
+        @* error summary *@
+        <div class="text-danger small mb-3">
+            @Html.ValidationSummary(excludePropertyErrors: true)
+        </div>
+
+        <div class="row g-3">
+            <div class="col-12 col-md-4">
+                <label class="form-label">Driver Code</label>
+                <input asp-for="DriverCode" class="form-control" placeholder="เช่น DRV001" />
+                <span class="text-danger small">@Html.ValidationMessageFor(m => m.DriverCode)</span>
+                <div class="text-muted small mt-1">ใช้เป็น Username สำหรับ login</div>
+            </div>
+
+            <div class="col-12 col-md-4">
+                <label class="form-label">ชื่อ-สกุล (TH)</label>
+                <input asp-for="DriverNameTH" class="form-control" placeholder="เช่น นาย ก้องภพ ใจดี" />
+                <span class="text-danger small">@Html.ValidationMessageFor(m => m.DriverNameTH)</span>
+            </div>
+
+            <div class="col-12 col-md-4">
+                <label class="form-label">Name (EN)</label>
+                <input asp-for="DriverNameEN" class="form-control" placeholder="เช่น Kongphop Jaidee" />
+                <span class="text-danger small">@Html.ValidationMessageFor(m => m.DriverNameEN)</span>
+            </div>
+
+            <div class="col-12 col-md-6">
+                <label class="form-label">Vehicle</label>
+                <select asp-for="VehicleId" class="form-select">
+                    <option value="">-- เลือกรถ --</option>
+                    @foreach (var v in vehicles)
+                    {
+                        <option value="@v.Id">@v.Text</option>
+                    }
+                </select>
+                <span class="text-danger small">@Html.ValidationMessageFor(m => m.VehicleId)</span>
+            </div>
+
+            <div class="col-12 col-md-6">
+                <label class="form-label">Initial Password</label>
+                <input asp-for="InitialPassword" class="form-control" placeholder="เช่น Welcome@123" />
+                <span class="text-danger small">@Html.ValidationMessageFor(m => m.InitialPassword)</span>
+                <div class="text-muted small mt-1">ถ้าไม่กรอก ระบบจะใช้ค่าเริ่มต้น (กำหนดใน Controller)</div>
+            </div>
+
+            <div class="col-12">
+                <div class="form-check mt-1">
+                    <input class="form-check-input" type="checkbox" id="IsActive" name="IsActive" value="true" @(Model?.IsActive == true ? "checked" : "") />
+                    <input type="hidden" name="IsActive" value="false" />
+                    <label class="form-check-label" for="IsActive">Active</label>
+                </div>
+            </div>
+        </div>
+
+        <div class="d-flex gap-2 justify-content-end mt-4">
+            <a asp-controller="Admin" asp-action="Fleet" class="btn btn-light">Cancel</a>
+            <button type="submit" class="btn btn-primary">Save Driver</button>
+        </div>
+    </form>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

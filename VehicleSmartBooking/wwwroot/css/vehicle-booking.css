@@ -1,0 +1,784 @@
+﻿:root {
+    --vb-font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Noto Sans Thai", "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --vb-text: #111827;
+    --vb-muted: rgba(17,24,39,.65);
+}
+
+body.vb-body {
+    font-family: var(--vb-font);
+    color: var(--vb-text);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+}
+
+/* Apple-ish typography scale */
+.vb-page-h1 {
+    font-size: 1.45rem;
+    line-height: 1.15;
+    font-weight: 800;
+    letter-spacing: -0.4px;
+    margin: 0;
+}
+
+.vb-page-sub {
+    color: var(--vb-muted);
+    font-size: .95rem;
+}
+
+/* label / form control ให้ดูสะอาด */
+.form-label {
+    font-weight: 600;
+    letter-spacing: -.1px;
+}
+
+.form-control, .form-select {
+    border-radius: 14px;
+    padding: .6rem .75rem;
+}
+
+.vb-card {
+    border-radius: 20px; /* ให้ใกล้ iOS */
+}
+
+/* Make sidebar responsive: keep similar proportion across laptop/desktop.
+   Use clamp() so width scales with viewport but stays within sensible px bounds. */
+.vb-body {
+    background: #f6f7fb;
+}
+
+.vb-shell {
+    display: flex;
+    min-height: 100vh;
+}
+
+.vb-topbar {
+    position: sticky;
+    top: 0;
+    z-index: 1030;
+}
+
+/* Fallback / mobile-first sidebar width: clamp keeps mobile usable.
+   On larger screens we override to a column proportion (col-3 / col-9). */
+.vb-sidebar {
+    width: clamp(200px, 18vw, 280px);
+    border-right: 1px solid rgba(0,0,0,.08);
+    background: #ffffff;
+}
+
+.vb-sidebar-inner {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+}
+
+.vb-sidebar-header {
+    padding: 1rem;
+    border-bottom: 1px solid rgba(0,0,0,.06);
+}
+
+.vb-logo {
+    width: 36px;
+    height: 36px;
+    border-radius: 12px;
+    display: grid;
+    place-items: center;
+    background: linear-gradient(135deg, rgba(13,110,253,.15), rgba(32,201,151,.15));
+    border: 1px solid rgba(0,0,0,.08);
+    font-weight: 800;
+}
+
+.vb-nav {
+    padding: .75rem;
+    display: grid;
+    gap: .5rem;
+}
+
+.vb-nav-item {
+    width: 100%;
+    border: 1px solid rgba(0,0,0,.08);
+    background: #fff;
+    border-radius: 14px;
+    padding: .75rem .85rem;
+    text-align: left;
+    display: flex;
+    align-items: center;
+    gap: .65rem;
+    transition: transform .12s ease, box-shadow .12s ease, border-color .12s ease;
+}
+
+    .vb-nav-item:hover {
+        transform: translateY(-1px);
+        border-color: rgba(13,110,253,.25);
+        box-shadow: 0 10px 18px rgba(0,0,0,.06);
+    }
+
+    .vb-nav-item.is-active {
+        border-color: rgba(13,110,253,.45);
+        box-shadow: 0 10px 18px rgba(0,0,0,.08);
+    }
+
+.vb-nav-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 999px;
+    background: rgba(0,0,0,.18);
+}
+
+.vb-nav-item.is-active .vb-nav-dot {
+    background: rgba(13,110,253,.85);
+}
+
+.vb-sidebar-footer {
+    margin-top: auto;
+    padding: 1rem;
+    border-top: 1px solid rgba(0,0,0,.06);
+}
+
+.vb-main {
+    flex: 1;
+}
+
+.vb-main-inner {
+    padding: 1rem;
+}
+
+@media (min-width: 992px) {
+    .vb-main-inner {
+        padding: 1.25rem 1.5rem;
+    }
+}
+
+@media (min-width: 992px) {
+    #vbSidebar.offcanvas {
+        transform: none !important;
+        visibility: visible !important;
+        position: static !important; /* ให้ทำตัวเป็น sidebar ใน flex */
+    }
+}
+
+/* At notebook/desktop sizes use column proportions similar to Bootstrap col-3 / col-9.
+   Sidebar becomes 25% and main content 75%, constrained by sensible min/max widths. */
+@media (min-width: 768px) {
+    .vb-sidebar {
+        flex: 0 0 25%;
+        max-width: 320px; /* don't grow beyond design */
+        min-width: 200px; /* ensure usability on narrow laptop screens */
+        width: 25%;
+    }
+
+    .vb-main {
+        flex: 0 0 75%;
+        width: 75%;
+    }
+
+    /* ensure offcanvas is left as a static sidebar on md+ */
+    #vbSidebar.offcanvas {
+        transform: none !important;
+        visibility: visible !important;
+        position: static !important;
+    }
+}
+
+.vb-card {
+    background: #fff;
+    border: 1px solid rgba(0,0,0,.08);
+    border-radius: 18px;
+    box-shadow: 0 10px 22px rgba(0,0,0,.05);
+}
+
+.vb-page-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+}
+
+.vb-badge {
+    padding: .35rem .65rem;
+    border-radius: 999px;
+    background: #f1f5ff;
+    border: 1px solid rgba(13,110,253,.18);
+    color: #0b3d91;
+    font-size: .85rem;
+    white-space: nowrap;
+}
+
+.vb-toggle {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .5rem;
+    justify-content: flex-start;
+}
+
+.vb-toggle-btn {
+    border: 1px solid rgba(0,0,0,.12);
+    background: #fff;
+    border-radius: 999px;
+    padding: .45rem .8rem;
+    font-weight: 600;
+    transition: .12s ease;
+}
+
+    .vb-toggle-btn:hover {
+        border-color: rgba(13,110,253,.30);
+    }
+
+    .vb-toggle-btn.is-active {
+        background: rgba(13,110,253,.12);
+        border-color: rgba(13,110,253,.40);
+    }
+
+.vb-hint {
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+    color: rgba(0,0,0,.55);
+    font-size: .9rem;
+}
+
+.vb-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 999px;
+    background: rgba(32,201,151,.65);
+}
+
+.vb-card-title {
+    display: flex;
+    align-items: center;
+    gap: .75rem;
+}
+
+.vb-title-icon {
+    width: 34px;
+    height: 34px;
+    border-radius: 12px;
+    display: grid;
+    place-items: center;
+    background: #f6f7fb;
+    border: 1px solid rgba(0,0,0,.06);
+    font-weight: 800;
+}
+
+.vb-veh-card {
+    border: 1px solid rgba(0,0,0,.08);
+    border-radius: 16px;
+    padding: 1rem;
+    background: #fff;
+    cursor: pointer;
+    height: 100%;
+    transition: transform .12s ease, box-shadow .12s ease, border-color .12s ease;
+    display: block;
+}
+
+.btn-check:checked + .vb-veh-card {
+    border-color: rgba(13,110,253,.45);
+    box-shadow: 0 10px 18px rgba(0,0,0,.08);
+    transform: translateY(-1px);
+}
+
+.vb-veh-img {
+    height: 140px; /* เพิ่มความสูง กันรูปโดนตัด */
+    border-radius: 14px;
+    background: radial-gradient(700px 240px at 0% 0%, rgba(13,110,253,.12), transparent 60%), radial-gradient(700px 240px at 100% 100%, rgba(32,201,151,.12), transparent 60%), #f6f7fb;
+    border: 1px solid rgba(0,0,0,.06);
+    overflow: hidden; /* กันล้น */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 10px; /* เว้นขอบให้สวย */
+}
+
+.vb-veh-img-el {
+    width: 100%;
+    height: 100%;
+    object-fit: contain; /* สำคัญ: ให้รูป fit อยู่ในกรอบ */
+    display: block;
+    margin: 0 auto;
+    filter: drop-shadow(0 10px 14px rgba(0,0,0,.10));
+}
+
+
+.vb-veh-name {
+    font-weight: 800;
+    margin-bottom: .15rem;
+}
+
+.vb-veh-sub {
+    font-size: .9rem;
+    color: rgba(0,0,0,.60);
+}
+
+.vb-divider {
+    height: 1px;
+    background: rgba(0,0,0,.08);
+}
+
+.vb-pill {
+    padding: .25rem .55rem;
+    border-radius: 999px;
+    background: rgba(32,201,151,.12);
+    border: 1px solid rgba(32,201,151,.28);
+    font-size: .85rem;
+    font-weight: 700;
+}
+
+.vb-approval {
+    border: 1px dashed rgba(0,0,0,.18);
+    border-radius: 16px;
+    padding: 1rem;
+    background: #fcfcff;
+}
+
+.vb-steps {
+    display: grid;
+    gap: .75rem;
+}
+
+.vb-step {
+    display: flex;
+    gap: .75rem;
+    align-items: flex-start;
+    padding: .75rem;
+    border-radius: 14px;
+    background: #fff;
+    border: 1px solid rgba(0,0,0,.06);
+}
+
+.vb-step-badge {
+    width: 30px;
+    height: 30px;
+    border-radius: 12px;
+    display: grid;
+    place-items: center;
+    background: rgba(13,110,253,.12);
+    border: 1px solid rgba(13,110,253,.18);
+    font-weight: 800;
+}
+
+.vb-step-title {
+    font-weight: 800;
+}
+
+.vb-step-sub {
+    color: rgba(0,0,0,.60);
+    font-size: .9rem;
+}
+
+.vb-section {
+    display: none;
+}
+
+    .vb-section.is-active {
+        display: block;
+    }
+
+.vb-page-hero {
+    background: linear-gradient(135deg, rgba(13,110,253,.10), rgba(32,201,151,.10));
+    border: 1px solid rgba(0,0,0,.08);
+    border-radius: 20px;
+    padding: 1.25rem 1.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+}
+
+.vb-page-title {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.vb-page-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 14px;
+    display: grid;
+    place-items: center;
+    font-size: 1.4rem;
+    background: #ffffff;
+    border: 1px solid rgba(0,0,0,.1);
+    box-shadow: 0 6px 14px rgba(0,0,0,.08);
+}
+
+.vb-page-h1 {
+    font-size: 1.4rem;
+    font-weight: 800;
+    margin: 0;
+}
+
+.vb-page-sub {
+    color: rgba(0,0,0,.65);
+    font-size: .95rem;
+}
+
+.vb-page-meta {
+    display: flex;
+    gap: .5rem;
+}
+
+.vb-meta-pill {
+    padding: .35rem .7rem;
+    border-radius: 999px;
+    font-size: .8rem;
+    font-weight: 600;
+    background: rgba(255,255,255,.85);
+    border: 1px solid rgba(0,0,0,.12);
+}
+
+.btn {
+    border-radius: 999px;
+    padding: .55rem 1rem;
+    font-weight: 600;
+}
+
+/* ให้ทุกอย่างดูนุ่มขึ้น */
+.vb-card, .vb-nav-item, .vb-veh-card {
+    box-shadow: 0 12px 28px rgba(0,0,0,.06);
+}
+
+.vb-step-body {
+    flex: 1;
+}
+
+.vb-approver-card {
+    margin-top: .4rem;
+    padding: .75rem .9rem;
+    border-radius: 14px;
+    background: #ffffff;
+    border: 1px solid rgba(0,0,0,.08);
+    display: grid;
+    row-gap: .35rem;
+}
+
+.vb-approver-row {
+    display: grid;
+    grid-template-columns: 120px 1fr;
+    column-gap: .75rem;
+    font-size: .9rem;
+}
+
+.vb-approver-label {
+    color: rgba(0,0,0,.55);
+}
+
+.vb-approver-value {
+    font-weight: 600;
+    color: #111827;
+}
+
+/* Mobile: label อยู่บน value */
+@media (max-width: 575.98px) {
+    .vb-approver-row {
+        grid-template-columns: 1fr;
+    }
+
+    .vb-approver-label {
+        font-size: .75rem;
+        color: rgba(0,0,0,.45);
+    }
+}
+
+/* ===== History UI ===== */
+.vb-stats {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: .75rem;
+}
+
+@media (max-width: 991.98px) {
+    .vb-stats {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+.vb-stat {
+    border: 1px solid rgba(0,0,0,.08);
+    background: #fff;
+    border-radius: 16px;
+    padding: .75rem .9rem;
+}
+
+.vb-stat-k {
+    color: rgba(0,0,0,.55);
+    font-size: .85rem;
+}
+
+.vb-stat-v {
+    font-weight: 800;
+    font-size: 1.15rem;
+}
+
+.vb-table-head {
+    border-bottom: 1px solid rgba(0,0,0,.08);
+}
+
+.table.vb-table thead th {
+    font-size: .85rem;
+    color: rgba(0,0,0,.55);
+    font-weight: 700;
+    border-bottom: 1px solid rgba(0,0,0,.08);
+    white-space: nowrap;
+}
+
+.table.vb-table tbody td {
+    vertical-align: top;
+    border-top: 1px solid rgba(0,0,0,.06);
+    padding: .9rem .75rem;
+}
+
+.vb-chip {
+    display: inline-flex;
+    padding: .25rem .55rem;
+    border-radius: 999px;
+    font-size: .8rem;
+    font-weight: 700;
+    background: rgba(13,110,253,.10);
+    border: 1px solid rgba(13,110,253,.18);
+}
+
+.vb-chip-alt {
+    background: rgba(32,201,151,.10);
+    border-color: rgba(32,201,151,.18);
+}
+
+.vb-veh-pill {
+    display: inline-flex;
+    padding: .25rem .55rem;
+    border-radius: 999px;
+    font-size: .8rem;
+    font-weight: 700;
+    background: rgba(0,0,0,.04);
+    border: 1px solid rgba(0,0,0,.08);
+}
+
+/* Status badges */
+.vb-status {
+    display: inline-flex;
+    align-items: center;
+    gap: .35rem;
+    padding: .28rem .6rem;
+    border-radius: 999px;
+    font-size: .8rem;
+    font-weight: 800;
+    border: 1px solid transparent;
+    white-space: nowrap;
+}
+
+    .vb-status::before {
+        content: "";
+        width: 8px;
+        height: 8px;
+        border-radius: 999px;
+        background: rgba(0,0,0,.35);
+    }
+
+.vb-status-pending {
+    background: rgba(255,193,7,.14);
+    border-color: rgba(255,193,7,.25);
+}
+
+    .vb-status-pending::before {
+        background: rgba(255,193,7,.9);
+    }
+
+.vb-status-approved {
+    background: rgba(13,110,253,.12);
+    border-color: rgba(13,110,253,.22);
+}
+
+    .vb-status-approved::before {
+        background: rgba(13,110,253,.9);
+    }
+
+.vb-status-rejected {
+    background: rgba(220,53,69,.12);
+    border-color: rgba(220,53,69,.22);
+}
+
+    .vb-status-rejected::before {
+        background: rgba(220,53,69,.9);
+    }
+
+.vb-status-completed {
+    background: rgba(32,201,151,.12);
+    border-color: rgba(32,201,151,.22);
+}
+
+    .vb-status-completed::before {
+        background: rgba(32,201,151,.9);
+    }
+
+.vb-history-card {
+    box-shadow: 0 12px 28px rgba(0,0,0,.06);
+}
+
+/* ===== Queue / Calendar ===== */
+.vb-calendar-head{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:.75rem;
+  margin-bottom:.75rem;
+}
+
+.vb-calendar-grid{
+  display:grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap:.5rem;
+}
+
+.vb-cal-dow{
+  font-size:.75rem;
+  color: rgba(0,0,0,.55);
+  text-align:center;
+  font-weight:700;
+  padding:.25rem 0;
+}
+
+.vb-cal-cell{
+  border:1px solid rgba(0,0,0,.08);
+  background:#fff;
+  border-radius:14px;
+  padding:.55rem;
+  min-height:70px;
+  cursor:pointer;
+  transition: transform .12s ease, box-shadow .12s ease, border-color .12s ease;
+  position: relative;
+}
+
+.vb-cal-cell:hover{
+  transform: translateY(-1px);
+  border-color: rgba(13,110,253,.25);
+  box-shadow: 0 10px 18px rgba(0,0,0,.06);
+}
+
+.vb-cal-cell.is-muted{
+  opacity:.45;
+}
+
+.vb-cal-cell.is-selected{
+  border-color: rgba(13,110,253,.55);
+  box-shadow: 0 10px 18px rgba(0,0,0,.10);
+}
+
+.vb-cal-day{
+  font-weight:800;
+  line-height:1;
+}
+
+.vb-cal-mini{
+  margin-top:.35rem;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:.25rem;
+  font-size:.75rem;
+  color: rgba(0,0,0,.55);
+}
+
+.vb-cal-dot {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    width: 10px;
+    height: 10px;
+    border-radius: 999px;
+    border: 1px solid rgba(0,0,0,.08);
+}
+
+.vb-dot-free{ background: rgba(32,201,151,.85); }
+.vb-dot-mid{ background: rgba(255,193,7,.95); }
+.vb-dot-busy{ background: rgba(220,53,69,.85); }
+
+.vb-calendar-legend{
+  display:flex;
+  flex-wrap:wrap;
+  gap:.75rem 1rem;
+}
+
+.vb-legend-item{
+  display:flex;
+  align-items:center;
+  gap:.45rem;
+  font-size:.85rem;
+  color: rgba(0,0,0,.60);
+}
+
+.vb-legend-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 999px;
+    border: 1px solid rgba(0,0,0,.08);
+}
+
+.vb-day-summary{
+  display:flex;
+  flex-wrap:wrap;
+  gap:.5rem;
+  justify-content:flex-start;
+}
+
+.vb-summary-pill{
+  display:inline-flex;
+  align-items:center;
+  gap:.4rem;
+  padding:.28rem .65rem;
+  border-radius:999px;
+  font-size:.8rem;
+  font-weight:800;
+  background: rgba(0,0,0,.04);
+  border:1px solid rgba(0,0,0,.08);
+}
+.vb-summary-pill b{ font-weight:900; }
+
+.vb-vehicle-line{
+  border:1px solid rgba(0,0,0,.08);
+  border-radius:16px;
+  padding:.85rem .9rem;
+  background:#fff;
+  margin-bottom:.75rem;
+}
+
+.vb-vehicle-head{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:1rem;
+}
+
+.vb-vehicle-name{
+  font-weight:900;
+}
+
+.vb-vehicle-meta{
+  font-size:.85rem;
+  color: rgba(0,0,0,.55);
+}
+
+.vb-timeline{
+  margin-top:.65rem;
+  display:flex;
+  flex-direction:column;
+  gap:.5rem;
+}
+
+.vb-booking-block{
+  border-radius:14px;
+  padding:.55rem .7rem;
+  border:1px solid rgba(13,110,253,.18);
+  background: rgba(13,110,253,.08);
+}
+
+.vb-booking-time{
+  font-weight:800;
+  font-size:.9rem;
+}
+
+.vb-booking-desc{
+  color: rgba(0,0,0,.60);
+  font-size:.85rem;
+  margin-top:.1rem;
+}

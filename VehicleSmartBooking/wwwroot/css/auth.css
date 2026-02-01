@@ -1,0 +1,213 @@
+﻿:root {
+    --brand1: #4f46e5;
+    --brand2: #06b6d4;
+    --ink: #0b1220;
+    --muted: #6b7280;
+    --card: #ffffff;
+}
+
+.auth-page {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+    background: radial-gradient(900px 420px at 15% 20%, rgba(79,70,229,.25), transparent 60%), radial-gradient(700px 360px at 90% 20%, rgba(6,182,212,.18), transparent 55%), linear-gradient(180deg, #0b1220, #0b1220 30%, #0f172a);
+}
+
+/* Card container */
+.auth-shell {
+    width: min(980px, 100%);
+    background: var(--card);
+    border-radius: 22px;
+    overflow: hidden;
+    box-shadow: 0 24px 80px rgba(0,0,0,.35);
+    border: 1px solid rgba(255,255,255,.10);
+    position: relative;
+}
+
+.auth-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    min-height: 520px;
+}
+
+/* panes */
+.pane {
+    padding: 44px 42px;
+    position: relative;
+    z-index: 2;
+    background: #fff;
+}
+
+.text-muted2 {
+    color: var(--muted);
+}
+
+.brand-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 18px;
+}
+
+.brand-dot {
+    width: 14px;
+    height: 14px;
+    border-radius: 4px;
+    background: linear-gradient(135deg, var(--brand1), var(--brand2));
+}
+
+.brand-name {
+    font-weight: 800;
+}
+
+/* Pills */
+.btn-pill {
+    border-radius: 999px;
+}
+
+/* Inputs */
+.form-control {
+    border-radius: 12px;
+    padding: 12px 12px;
+}
+
+/* Choice cards */
+.choice-card {
+    border: 1px solid rgba(2,6,23,.10);
+    border-radius: 14px;
+    padding: 14px;
+    background: #fff;
+    transition: transform .15s ease, box-shadow .15s ease;
+    cursor: pointer;
+}
+
+    .choice-card:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 12px 40px rgba(2,6,23,.08);
+    }
+
+.choice-icon {
+    width: 42px;
+    height: 42px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(79,70,229,.10);
+    color: var(--brand1);
+    flex: 0 0 auto;
+    font-weight: 800;
+}
+
+.choice-icon-ms {
+    background: #fff;
+    border: 1px solid #e5e7eb;
+}
+
+.choice-icon-alt {
+    background: rgba(6,182,212,.12);
+    color: #0891b2;
+    font-size: 20px;
+}
+
+/* Local form toggle */
+.local-form {
+    display: none;
+    margin-top: 12px;
+}
+
+    .local-form.is-open {
+        display: block;
+    }
+
+/* =========================
+   Overlay panel (NEW – no circle, no ::before/::after)
+   Uses clip-path for deep curved edge
+   ========================= */
+
+.overlay {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 50%;
+    left: 50%;
+    background: linear-gradient(135deg, #4f46e5, #06b6d4);
+    color: #fff;
+    z-index: 3;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 44px 42px;
+    /* ✅ โค้งลึกจากฝั่งซ้าย (Sign in state) */
+    clip-path: inset(0 0 0 0 round 136px 0 0 136px);
+    /* animation */
+    transition: transform .55s ease, clip-path .55s ease;
+}
+
+/* เนื้อหาอยู่บนสุด */
+.overlay-inner {
+    position: relative;
+    z-index: 2;
+    max-width: 320px;
+    text-align: center;
+}
+
+.overlay h3 {
+    font-weight: 800;
+    margin-bottom: 10px;
+}
+
+.overlay p {
+    color: rgba(255,255,255,.88);
+}
+
+/* =========================
+   Signup mode
+   ========================= */
+
+.auth-shell.is-signup .overlay {
+    /* สไลด์ overlay ไปฝั่งซ้าย */
+    transform: translateX(-100%);
+    /* ✅ โค้งกลับด้าน (ฝั่งขวา) */
+    clip-path: inset(0 0 0 0 round 0 136px 136px 0);
+}
+
+/* =========================
+   Shadow (optional – ดูมีมิติ)
+   ========================= */
+
+/* เงาฝั่งซ้าย */
+.overlay {
+    filter: drop-shadow(-18px 0 28px rgba(2,6,23,.18));
+}
+
+/* เงาฝั่งขวา */
+.auth-shell.is-signup .overlay {
+    filter: drop-shadow(18px 0 28px rgba(2,6,23,.18));
+}
+
+/* Responsive */
+@media (max-width: 992px) {
+    .auth-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .overlay {
+        display: none;
+    }
+
+    .pane-signup {
+        display: none;
+    }
+
+    .auth-shell.is-signup .pane-signin {
+        display: none;
+    }
+
+    .auth-shell.is-signup .pane-signup {
+        display: block;
+    }
+}

@@ -1,0 +1,198 @@
+﻿@model VehicleBooking.Web.Domain.Entities.Booking
+
+@{
+    Layout = "_VehicleBookingLayout";
+    ViewData["Title"] = $"Booking #{Model?.BookingId}";
+
+    if (Model == null)
+    {
+        return;
+    }
+
+    // ===== Derived values (กัน Razor เพี้ยน) =====
+    var requesterName =
+        !string.IsNullOrWhiteSpace(Model.Requester?.UsernameTH)
+            ? Model.Requester.UsernameTH
+            : !string.IsNullOrWhiteSpace(Model.Requester?.UsernameEN)
+                ? Model.Requester.UsernameEN
+                : Model.RequesterUserId.ToString();
+
+    var requesterCode = Model.Requester?.UserCode ?? "-";
+    var passengers = Model.PassengerCount ?? 1;
+    var jobNo = string.IsNullOrWhiteSpace(Model.JobNo) ? "-" : Model.JobNo;
+    var costCenter = string.IsNullOrWhiteSpace(Model.CostCenter) ? "-" : Model.CostCenter;
+    var soNo = string.IsNullOrWhiteSpace(Model.SONo) ? "-" : Model.SONo;
+
+    var vehicleAssigned = Model.AssignedVehicleId.HasValue ? $"#{Model.AssignedVehicleId}" : "-";
+    var driverAssigned = Model.AssignedDriverId.HasValue ? $"#{Model.AssignedDriverId}" : "-";
+    var isExternal = Model.IsExternalRental ? "External Vendor" : "Company Vehicle";
+
+    var createdLocal = Model.CreatedAtUtc.ToLocalTime();
+}
+
+<section id="sec-history" class="vb-section is-active">
+    <!-- ===== Page Head ===== -->
+    <div class="vb-page-head vb-page-hero mb-4">
+        <div class="vb-page-title">
+            <div class="vb-page-icon">🧾</div>
+            <div>
+                <h1 class="vb-page-h1">Booking Detail</h1>
+                <div class="vb-page-sub">Full information for booking #@Model.BookingId</div>
+            </div>
+        </div>
+
+        <div class="vb-page-meta d-none d-md-flex">
+            <span class="vb-meta-pill">Task</span>
+            <span class="vb-meta-pill">Booking #@Model.BookingId</span>
+        </div>
+    </div>
+
+    <div class="row g-3">
+        <!-- ===== Left column ===== -->
+        <div class="col-12 col-md-4">
+            <!-- Request Info -->
+            <div class="vb-card p-3 p-md-4 mb-3">
+                <div class="fw-semibold mb-3">Request Info</div>
+
+                <div class="vb-approver-row mb-2">
+                    <div class="vb-approver-label">Requester</div>
+                    <div class="vb-approver-value">@requesterName</div>
+                </div>
+
+                <div class="vb-approver-row mb-2">
+                    <div class="vb-approver-label">Employee Code</div>
+                    <div class="vb-approver-value">@requesterCode</div>
+                </div>
+
+                <div class="vb-approver-row mb-2">
+                    <div class="vb-approver-label">Trip Type</div>
+                    <div class="vb-approver-value">@Model.TripType</div>
+                </div>
+
+                <div class="vb-approver-row mb-2">
+                    <div class="vb-approver-label">Vehicle Type</div>
+                    <div class="vb-approver-value">@Model.VehicleTypeRequested</div>
+                </div>
+
+                <div class="vb-approver-row mb-2">
+                    <div class="vb-approver-label">Passengers</div>
+                    <div class="vb-approver-value">@passengers</div>
+                </div>
+
+                <div class="vb-approver-row">
+                    <div class="vb-approver-label">Status</div>
+                    <div class="vb-approver-value">@Model.Status</div>
+                </div>
+            </div>
+
+            <!-- Attachments -->
+            <div class="vb-card p-3 p-md-4 mb-3">
+                <div class="fw-semibold mb-2">Attachments</div>
+
+                @if (Model.Attachments?.Any() == true)
+                {
+                    <ul class="list-unstyled mb-0">
+                        @foreach (var a in Model.Attachments)
+                        {
+                            <li class="mb-1">
+                                <a href="@a.StoragePath" target="_blank">@a.FileName</a>
+                            </li>
+                        }
+                    </ul>
+                }
+                else
+                {
+                    <div class="text-muted">No attachments</div>
+                }
+            </div>
+        </div>
+
+        <!-- ===== Right column ===== -->
+        <div class="col-12 col-md-8">
+            <div class="vb-card p-3 p-md-4 mb-3">
+                <div class="d-flex justify-content-between align-items-start">
+                    <div>
+                        <div class="fw-semibold">Route & Schedule</div>
+                        <div class="text-muted small">Details of trip</div>
+                    </div>
+                    <div class="text-end">
+                        <div class="fw-semibold">Booking #@Model.BookingId</div>
+                        <div class="text-muted small">@createdLocal.ToString("dd/MM/yyyy HH:mm")</div>
+                    </div>
+                </div>
+
+                <div class="vb-divider my-3"></div>
+
+                <div class="mb-2">
+                    <div class="fw-semibold">From</div>
+                    <div class="text-muted">@Model.PickupLocation</div>
+                </div>
+
+                <div class="mb-2">
+                    <div class="fw-semibold">To</div>
+                    <div class="text-muted">@Model.DestinationLocation</div>
+                </div>
+
+                <div class="row g-2 mt-3">
+                    <div class="col-6">
+                        <div class="fw-semibold">Start</div>
+                        <div class="text-muted">@Model.StartAtUtc.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</div>
+                    </div>
+                    <div class="col-6">
+                        <div class="fw-semibold">End</div>
+                        <div class="text-muted">@Model.EndAtUtc.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</div>
+                    </div>
+                </div>
+
+                <div class="vb-divider my-3"></div>
+
+                <div class="row g-2">
+                    <div class="col-md-4">
+                        <div class="fw-semibold">Job No</div>
+                        <div class="text-muted">@jobNo</div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="fw-semibold">Cost Center</div>
+                        <div class="text-muted">@costCenter</div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="fw-semibold">SO No</div>
+                        <div class="text-muted">@soNo</div>
+                    </div>
+                </div>
+
+                <div class="vb-divider my-3"></div>
+
+                <div class="row g-2">
+                    <div class="col-md-4">
+                        <div class="fw-semibold">Vehicle</div>
+                        <div class="text-muted">@vehicleAssigned</div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="fw-semibold">Driver</div>
+                        <div class="text-muted">@driverAssigned</div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="fw-semibold">Service Type</div>
+                        <div class="text-muted">@isExternal</div>
+                    </div>
+                </div>
+
+                <div class="vb-divider my-3"></div>
+
+                <div>
+                    <div class="fw-semibold">Purpose</div>
+                    <div class="text-muted">@Model.Purpose</div>
+                </div>
+
+                <div class="vb-divider my-3"></div>
+
+                <div class="d-flex justify-content-end">
+                    <a asp-action="MyBookings" class="btn btn-light">
+                        Back to My Task
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>

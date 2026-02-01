@@ -1,0 +1,75 @@
+:root {
+    --brand: #4f46e5; /* โทนม่วงน้ำเงินคล้ายภาพ */
+    --ink: #0b1220;
+    --muted: #6b7280;
+    --card: rgba(255,255,255,.92);
+}
+
+html, body {
+    height: 100%;
+}
+
+body {
+    font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+    color: var(--ink);
+    background: #fff;
+}
+
+.brand-dot {
+    width: 14px;
+    height: 14px;
+    border-radius: 4px;
+    background: linear-gradient(135deg, var(--brand), #60a5fa);
+    display: inline-block;
+}
+
+.navbar .nav-link {
+    font-weight: 500;
+    color: #111827;
+    opacity: .78;
+}
+
+    .navbar .nav-link:hover {
+        opacity: 1;
+    }
+
+.btn-pill {
+    border-radius: 999px;
+}
+
+.hero {
+    position: relative;
+    overflow: hidden;
+    padding: 72px 0;
+    background: radial-gradient(900px 380px at 80% 10%, rgba(79,70,229,.22), transparent 60%), radial-gradient(700px 320px at 15% 20%, rgba(96,165,250,.18), transparent 55%), linear-gradient(180deg, #f8fafc, #ffffff 60%);
+}
+
+.hero-wave {
+    position: absolute;
+    right: -120px;
+    top: 120px;
+    width: 520px;
+    height: 520px;
+    background: radial-gradient(circle at 30% 30%, rgba(79,70,229,.35), rgba(79,70,229,.10) 60%, transparent 70%);
+    filter: blur(2px);
+    border-radius: 50%;
+}
+
+.hero-card {
+    background: var(--card);
+    border: 1px solid rgba(2,6,23,.08);
+    box-shadow: 0 24px 60px rgba(79,70,229,.18);
+    border-radius: 18px;
+}
+
+.section {
+    padding: 72px 0;
+}
+
+.section-title {
+    max-width: 720px;
+}
+
+.text-muted2 {
+    color: var(--muted);
+}

@@ -1,0 +1,279 @@
+﻿@using System.Security.Claims
+@{
+    // =========================================================
+    // Active nav (controller/action fallback)
+    // =========================================================
+    var active = (ViewData["ActiveNav"] as string) ?? "";
+
+    var controller = (ViewContext.RouteData.Values["controller"]?.ToString() ?? "").ToLowerInvariant();
+    var action = (ViewContext.RouteData.Values["action"]?.ToString() ?? "").ToLowerInvariant();
+
+    if (string.IsNullOrEmpty(active))
+    {
+        // Booking
+        if (controller == "booking" && action == "create") active = "MyRequest";
+        else if (controller == "booking" && (action == "mybookings" || action == "detail")) active = "MyTask";
+        else if (controller == "booking" && action == "queue") active = "Queue";
+
+        // Approvals
+        else if (controller == "approvals") active = "Approvals";
+
+        // Admin
+        else if (controller == "admin") active = "Admin";
+
+        // Driver
+        else if (controller == "driver") active = "Driver";
+
+        else active = "MyTask";
+    }
+
+    // =========================================================
+    // Role checks (from ClaimsFactory -> ClaimTypes.Role)
+    // =========================================================
+    var isUser = User.IsInRole("User");
+    var isApprover = User.IsInRole("Approver");
+    var isAdmin = User.IsInRole("Admin");
+    var isDriver = User.IsInRole("Driver");
+
+    // Business rule:
+    // - Driver "cannot book" / "cannot view queue" if driver-only.
+    // - If user has other roles too (User/Approver/Admin) => allow booking pages.
+    var canBook = isUser || isApprover || isAdmin;
+    var canSeeQueue = canBook; // same rule
+    var canSeeApprovals = isApprover || isAdmin; // admin can help approve if you want
+    var canSeeAdmin = isAdmin;
+
+    // =========================================================
+    // Resolve display name + user code
+    // =========================================================
+    var usernameEn = User.FindFirst("DisplayName")?.Value ?? User.Identity?.Name ?? "";
+    var userCode = User.FindFirst("UserCode")?.Value
+                   ?? User.FindFirst(ClaimTypes.NameIdentifier)?.Value
+                   ?? "";
+
+    // Build initials: ignore common prefixes like "Mr."
+    string GetInitials(string full)
+    {
+        if (string.IsNullOrWhiteSpace(full)) return "";
+        var prefixes = new[] { "mr", "mrs", "ms", "dr" };
+        var parts = full.Split(' ', StringSplitOptions.RemoveEmptyEntries)
+                        .Where(p => !prefixes.Contains(p.TrimEnd('.').ToLowerInvariant()))
+                        .ToArray();
+        if (parts.Length == 0) return "";
+        if (parts.Length == 1)
+        {
+            var p = parts[0];
+            return p.Length >= 2 ? p.Substring(0, 2).ToUpperInvariant() : p.Substring(0, 1).ToUpperInvariant();
+        }
+        var first = parts.First()[0];
+        var last = parts.Last()[0];
+        return (char.ToUpperInvariant(first).ToString() + char.ToUpperInvariant(last).ToString());
+    }
+
+    string GetShortName(string full)
+    {
+        if (string.IsNullOrWhiteSpace(full)) return "";
+        var prefixes = new[] { "mr", "mrs", "ms", "dr" };
+        var parts = full.Split(' ', StringSplitOptions.RemoveEmptyEntries)
+                        .Where(p => !prefixes.Contains(p.TrimEnd('.').ToLowerInvariant()))
+                        .ToArray();
+        if (parts.Length == 0) return full;
+        if (parts.Length == 1) return parts[0];
+        return parts[0] + " " + parts.Last().Substring(0, 1) + ".";
+    }
+
+    var initials = GetInitials(usernameEn);
+    var shortName = GetShortName(usernameEn);
+
+    string RoleBadgeText()
+    {
+        // show priority-ish: Admin > Approver > Driver > User
+        if (isAdmin) return "Admin";
+        if (isApprover) return "Approver";
+        if (isDriver) return "Driver";
+        if (isUser) return "User";
+        return "User";
+    }
+}
+
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>@ViewData["Title"] - VehicleSmartBooking</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" asp-append-version="true" />
+    <link href="~/lib/bootstrap-icons-1.13.1/bootstrap-icons.min.css" rel="stylesheet" />
+    <link rel="stylesheet" href="~/css/vehicle-booking.css" asp-append-version="true" />
+
+    @RenderSection("Styles", required: false)
+</head>
+
+<body class="vb-body">
+
+    <!-- Topbar (mobile) -->
+    <header class="vb-topbar d-md-none border-bottom bg-white">
+        <div class="container-fluid py-2 d-flex align-items-center gap-2">
+            <button class="btn btn-outline-secondary btn-sm" type="button"
+                    data-bs-toggle="offcanvas" data-bs-target="#vbSidebar" aria-controls="vbSidebar">
+                ☰
+            </button>
+            <div class="vb-brand d-flex align-items-center gap-2">
+                <div class="vb-logo">VB</div>
+                <div class="fw-semibold">Vehicle Booking</div>
+            </div>
+        </div>
+    </header>
+
+    <div class="vb-shell">
+        <!-- Sidebar -->
+        <aside class="vb-sidebar offcanvas offcanvas-md offcanvas-start" tabindex="-1" id="vbSidebar" aria-labelledby="vbSidebarLabel">
+            <div class="offcanvas-header d-md-none">
+                <h5 class="offcanvas-title" id="vbSidebarLabel">เมนู</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+            </div>
+
+            <div class="vb-sidebar-inner">
+                <div class="vb-sidebar-header">
+                    <div class="vb-brand d-flex align-items-center gap-2">
+                        <div class="vb-logo">VB</div>
+                        <div>
+                            <div class="fw-semibold">Vehicle Booking</div>
+                            <div class="text-muted small">Role-based Navigation</div>
+                        </div>
+                    </div>
+                </div>
+
+                <nav class="vb-nav">
+                    @* ========= Requester pages (User/Approver/Admin) ========= *@
+                    @if (canBook)
+                    {
+                        <div class="text-muted small px-2 mt-1 mb-2" style="opacity:.85;">REQUEST</div>
+
+                        <a asp-controller="Booking" asp-action="Create"
+                           class="vb-nav-item @(active == "MyRequest" ? "is-active" : "")"
+                           aria-current="@(active == "MyRequest" ? "page" : "")">
+                            <span class="vb-nav-dot"></span>
+                            My Request
+                        </a>
+
+                        <a asp-controller="Booking" asp-action="MyBookings"
+                           class="vb-nav-item @(active == "MyTask" ? "is-active" : "")"
+                           aria-current="@(active == "MyTask" ? "page" : "")">
+                            <span class="vb-nav-dot"></span>
+                            My Task
+                        </a>
+
+                        @if (canSeeQueue)
+                        {
+                            <a asp-controller="Booking" asp-action="Queue"
+                               class="vb-nav-item @(active == "Queue" ? "is-active" : "")"
+                               aria-current="@(active == "Queue" ? "page" : "")">
+                                <span class="vb-nav-dot"></span>
+                                ดูคิวรถ
+                            </a>
+                        }
+                    }
+
+                    @* ========= Approver ========= *@
+                    @if (canSeeApprovals)
+                    {
+                        <div class="text-muted small px-2 mt-3 mb-2" style="opacity:.85;">APPROVAL</div>
+
+                        <a asp-controller="Approvals" asp-action="Pending"
+                           class="vb-nav-item @(active == "Approvals" ? "is-active" : "")"
+                           aria-current="@(active == "Approvals" ? "page" : "")">
+                            <span class="vb-nav-dot"></span>
+                            Pending Approvals
+                        </a>
+
+                        <a asp-controller="Approvals" asp-action="History"
+                           class="vb-nav-item">
+                            <span class="vb-nav-dot"></span>
+                            Approval History
+                        </a>
+                    }
+
+                    @* ========= Admin ========= *@
+                    @if (canSeeAdmin)
+                    {
+                        <div class="text-muted small px-2 mt-3 mb-2" style="opacity:.85;">ADMIN</div>
+
+                        <a asp-controller="Admin" asp-action="Worklist"
+                           class="vb-nav-item @(active == "Admin" ? "is-active" : "")"
+                           aria-current="@(active == "Admin" ? "page" : "")">
+                            <span class="vb-nav-dot"></span>
+                            Admin Worklist
+                        </a>
+
+                        <a asp-controller="Admin" asp-action="Vehicles" class="vb-nav-item">
+                            <span class="vb-nav-dot"></span>
+                            Vehicles
+                        </a>
+
+                        <a asp-controller="Admin" asp-action="Drivers" class="vb-nav-item">
+                            <span class="vb-nav-dot"></span>
+                            Drivers
+                        </a>
+
+                        <a asp-controller="Admin" asp-action="Users" class="vb-nav-item">
+                            <span class="vb-nav-dot"></span>
+                            Users & Roles
+                        </a>
+                    }
+
+                    @* ========= Driver ========= *@
+                    @if (isDriver)
+                    {
+                        <div class="text-muted small px-2 mt-3 mb-2" style="opacity:.85;">DRIVER</div>
+
+                        <a asp-controller="Driver" asp-action="MyJobs"
+                           class="vb-nav-item @(active == "Driver" ? "is-active" : "")"
+                           aria-current="@(active == "Driver" ? "page" : "")">
+                            <span class="vb-nav-dot"></span>
+                            My Jobs
+                        </a>
+                    }
+                </nav>
+
+                <div class="vb-sidebar-footer">
+                    <div class="d-flex align-items-center gap-2">
+                        <div class="vb-logo" title="@usernameEn">@initials</div>
+
+                        <div class="flex-grow-1">
+                            <div class="fw-semibold d-flex align-items-center gap-2" style="font-size:.95rem;">
+                                <span>@shortName</span>
+                                <span class="badge text-bg-light border" style="font-weight:600;">@RoleBadgeText()</span>
+                            </div>
+                            <div class="text-muted small">@userCode</div>
+                        </div>
+
+                        <form asp-controller="Account" asp-action="Logout" method="post" class="m-0">
+                            @Html.AntiForgeryToken()
+                            <button type="submit" class="btn btn-sm btn-outline-secondary" title="Log out">
+                                <i class="bi bi-box-arrow-right"></i>
+                            </button>
+                        </form>
+                    </div>
+                </div>
+
+            </div>
+        </aside>
+
+        <!-- Main -->
+        <main class="vb-main">
+            <div class="vb-main-inner">
+                @RenderBody()
+            </div>
+        </main>
+    </div>
+    <script src="~/lib/jquery/dist/jquery.min.js"></script>
+    <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+    @await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>

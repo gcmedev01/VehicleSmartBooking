@@ -1,0 +1,87 @@
+﻿<!DOCTYPE html>
+
+<html>
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>@ViewData["Title"] - VehicleSmartBooking</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" asp-append-version="true" />
+    <link href="~/lib/bootstrap-icons-1.13.1/bootstrap-icons.min.css" rel="stylesheet" />
+    <link rel="stylesheet" href="~/css/vehicle-booking.css" asp-append-version="true" />
+
+    @RenderSection("Styles", required: false)
+</head>
+<body class="vb-body">
+    <!-- Topbar (mobile) -->
+    <header class="vb-topbar d-md-none border-bottom bg-white">
+        <div class="container-fluid py-2 d-flex align-items-center gap-2">
+            <button class="btn btn-outline-secondary btn-sm" type="button"
+                    data-bs-toggle="offcanvas" data-bs-target="#vbSidebar" aria-controls="vbSidebar">
+                ☰
+            </button>
+            <div class="vb-brand d-flex align-items-center gap-2">
+                <div class="vb-logo">VB</div>
+                <div class="fw-semibold">Vehicle Booking</div>
+            </div>
+        </div>
+    </header>
+
+    <div class="vb-shell">
+        <!-- Sidebar -->
+        <aside class="vb-sidebar offcanvas offcanvas-md offcanvas-start" tabindex="-1" id="vbSidebar" aria-labelledby="vbSidebarLabel">
+            <div class="offcanvas-header d-md-none">
+                <h5 class="offcanvas-title" id="vbSidebarLabel">เมนู</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+            </div>
+
+            <div class="vb-sidebar-inner">
+                <div class="vb-sidebar-header">
+                    <div class="vb-brand d-flex align-items-center gap-2">
+                        <div class="vb-logo">VB</div>
+                        <div>
+                            <div class="fw-semibold">Vehicle Booking</div>
+                            <div class="text-muted small">Single-page UI</div>
+                        </div>
+                    </div>
+                </div>
+
+                <nav class="vb-nav">
+                    <button type="button" class="vb-nav-item is-active" data-vb-nav="#sec-booking" data-bs-dismiss="offcanvas">
+                        <span class="vb-nav-dot"></span>
+                        My Request
+                    </button>
+                    <button type="button" class="vb-nav-item" data-vb-nav="#sec-history" data-bs-dismiss="offcanvas">
+                        <span class="vb-nav-dot"></span>
+                        My Task
+                    </button>
+                    <button type="button" class="vb-nav-item" data-vb-nav="#sec-queue" data-bs-dismiss="offcanvas">
+                        <span class="vb-nav-dot"></span>
+                        ดูคิวรถ
+                    </button>
+                </nav>
+
+                @* <div class="vb-sidebar-footer">
+                    <div class="small text-muted">
+                        * UI นี้เป็นโครงสำหรับต่อ API/DB ภายหลัง
+                    </div>
+                </div> *@
+            </div>
+        </aside>
+
+        <!-- Main -->
+        <main class="vb-main">
+            <div class="vb-main-inner">
+                @RenderBody()
+            </div>
+        </main>
+    </div>
+
+    <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="~/js/vehicle-booking.js" asp-append-version="true"></script>
+    @await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>

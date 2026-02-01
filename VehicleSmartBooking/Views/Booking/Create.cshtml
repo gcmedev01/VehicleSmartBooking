@@ -1,0 +1,333 @@
+﻿
+@{
+    Layout = "_VehicleBookingLayout";
+    ViewData["Title"] = "Vehicle Booking";
+}
+
+<!-- ====== BOOKING SECTION ====== -->
+<section id="sec-booking" class="vb-section is-active">
+    <div class="vb-page-head vb-page-hero mb-4">
+        <div class="vb-page-title">
+            <div class="vb-page-icon">🚗</div>
+            <div>
+                <h1 class="vb-page-h1">Vehicle Service Request</h1>
+                <div class="vb-page-sub">
+                    Online vehicle smart booking
+                </div>
+            </div>
+        </div>
+
+        <div class="vb-page-meta d-none d-md-flex">
+            <span class="vb-meta-pill">Smart Booking</span>
+            <span class="vb-meta-pill">Auto Dispatch</span>
+        </div>
+    </div>
+
+    <!-- Booking Type Selector -->
+    <div class="vb-card p-3 p-md-4 mb-3">
+        <div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-2">
+            <div class="fw-semibold">ประเภทการจอง</div>
+            <div class="vb-toggle">
+                <button type="button" class="vb-toggle-btn is-active" data-vb-booking="in">
+                    จองในจังหวัด
+                </button>
+                <button type="button" class="vb-toggle-btn" data-vb-booking="out">
+                    จองนอกจังหวัด
+                </button>
+                <button type="button" class="vb-toggle-btn" data-vb-booking="personal">
+                    ใช้รถส่วนตัว
+                </button>
+            </div>
+        </div>
+
+        @* <div class="vb-hint mt-2">
+            <span class="vb-dot"></span>
+            “ใช้รถส่วนตัว” เว้นไว้ก่อน (โชว์ placeholder)
+        </div> *@
+    </div>
+
+    <!-- ===== Form Wrapper ===== -->
+    <form method="post" enctype="multipart/form-data" class="vb-form" id="vbForm">
+        <!-- Hidden to know selected mode -->
+        <input type="hidden" name="BookingMode" id="BookingMode" value="in" />
+
+        <!-- Requester -->
+        <div class="vb-card p-3 p-md-4 mb-3">
+            <div class="vb-card-title mb-3">
+                <div class="vb-title-icon">1</div>
+                <div>
+                    <div class="fw-semibold">สำหรับผู้ขอใช้บริการ</div>
+                    <div class="text-muted small">ข้อมูลผู้ยื่นขอใช้รถ</div>
+                </div>
+            </div>
+
+            <div class="row g-3">
+                <div class="col-12 col-md-3">
+                    <label class="form-label">รหัสพนักงาน</label>
+                    <input type="text" class="form-control" name="EmpCode" value="61130500049" required />
+                </div>
+                <div class="col-12 col-md-5">
+                    <label class="form-label">ชื่อ-นามสกุล</label>
+                    <input type="text" class="form-control" name="FullName" value="นาย ธนัญกรณ์ เกษรศิริศิษฐ์" required />
+                </div>
+                <div class="col-12 col-md-4">
+                    <label class="form-label">หน่วยงาน</label>
+                    <input type="text" class="form-control" name="Department" value="C-OR-DT" required />
+                </div>
+                <div class="col-12 col-md-4">
+                    <label class="form-label">เบอร์โทรติดต่อ</label>
+                    <input type="tel" class="form-control" name="Phone" value="0805152393" required />
+                </div>
+            </div>
+        </div>
+
+        <!-- Details -->
+        <div class="vb-card p-3 p-md-4 mb-3">
+            <div class="vb-card-title mb-3">
+                <div class="vb-title-icon">2</div>
+                <div>
+                    <div class="fw-semibold">รายละเอียด</div>
+                    <div class="text-muted small">ข้อมูลการเดินทางและวัตถุประสงค์</div>
+                </div>
+            </div>
+
+            <!-- Vehicle Type with preview -->
+            <div class="mb-3">
+                <label class="form-label">ประเภทรถ</label>
+
+                <div class="row g-3">
+                    <div class="col-12 col-md-4">
+                        <input class="btn-check" type="radio" name="VehicleType" id="vehPickup" value="pickup" required>
+                        <label class="vb-veh-card" for="vehPickup">
+                            <div class="vb-veh-img">
+                                <img class="vb-veh-img-el"
+                                     src="~/img/pickup-truck.png"
+                                     asp-append-version="true"
+                                     alt="รถกระบะ" />
+                            </div>
+                            <div class="vb-veh-name">รถกระบะ</div>
+                            <div class="vb-veh-sub">เหมาะกับงานขนของ/ไซต์งาน</div>
+                        </label>
+                    </div>
+
+                    <div class="col-12 col-md-4">
+                        <input class="btn-check" type="radio" name="VehicleType" id="vehVan" value="van">
+                        <label class="vb-veh-card" for="vehVan">
+                            <div class="vb-veh-img">
+                                <img class="vb-veh-img-el"
+                                     src="~/img/van.png"
+                                     asp-append-version="true"
+                                     alt="รถตู้" />
+                            </div>
+                            <div class="vb-veh-name">รถตู้</div>
+                            <div class="vb-veh-sub">เหมาะกับหลายคน/เดินทางไกล</div>
+                        </label>
+                    </div>
+
+                    <div class="col-12 col-md-4">
+                        <input class="btn-check" type="radio" name="VehicleType" id="vehSedan" value="sedan">
+                        <label class="vb-veh-card" for="vehSedan">
+                            <div class="vb-veh-img">
+                                <img class="vb-veh-img-el"
+                                     src="~/img/sedan.png"
+                                     asp-append-version="true"
+                                     alt="รถเก๋ง" />
+                            </div>
+                            <div class="vb-veh-name">รถเก๋ง</div>
+                            <div class="vb-veh-sub">เหมาะกับงานทั่วไป/พบลูกค้า</div>
+                        </label>
+                    </div>
+
+                </div>
+            </div>
+
+            <div class="row g-3">
+                <div class="col-12 col-md-4">
+                    <label class="form-label">Job No / Cost Center / SO No</label>
+                    <input type="text" class="form-control" name="RefNo" placeholder="เช่น JOB-2026-001" />
+                </div>
+
+                <div class="col-12 col-md-4">
+                    <label class="form-label">วันที่ เวลา เริ่มต้น</label>
+                    <input type="datetime-local" class="form-control" name="StartAt" required />
+                </div>
+
+                <div class="col-12 col-md-4">
+                    <label class="form-label">วันที่ เวลา สิ้นสุด</label>
+                    <input type="datetime-local" class="form-control" name="EndAt" required />
+                </div>
+
+                <div class="col-12 col-md-6">
+                    <label class="form-label">จุดรับ</label>
+                    <input type="text" class="form-control" name="PickupPoint" placeholder="สถานที่/จุดนัดพบ" required />
+                </div>
+
+                <div class="col-12 col-md-6">
+                    <label class="form-label">ปลายทาง</label>
+                    <input type="text" class="form-control" name="Destination" placeholder="สถานที่ปลายทาง" required />
+                </div>
+
+                <div class="col-12 col-md-6">
+                    <label class="form-label">เพื่อ</label>
+                    <input type="text" class="form-control" name="Purpose" placeholder="วัตถุประสงค์การเดินทาง" required />
+                </div>
+
+                <div class="col-12 col-md-3">
+                    <label class="form-label">จำนวนผู้ร่วมเดินทาง</label>
+                    <input type="number" class="form-control" name="PassengerCount" min="1" value="1" required />
+                </div>
+
+                <div class="col-12">
+                    <label class="form-label">รายละเอียดอื่นๆ</label>
+                    <textarea class="form-control" rows="3" name="OtherDetail" placeholder="ระบุข้อมูลเพิ่มเติม เช่น จุดแวะ/ของที่ต้องขน/ข้อจำกัดเวลา"></textarea>
+                </div>
+
+                <div class="col-12">
+                    <label class="form-label">แนบเอกสารเพิ่มเติม (ถ้ามี)</label>
+                    <input type="file" class="form-control" name="Attachments" multiple />
+                    <div class="form-text">รองรับแนบได้หลายไฟล์</div>
+                </div>
+            </div>
+
+            <!-- OUT-OF-PROVINCE EXTRA -->
+            <div id="vbOutExtra" class="vb-out-extra mt-4">
+                <div class="vb-divider my-3"></div>
+
+                <div class="d-flex align-items-start gap-2 mb-2">
+                    <div class="vb-pill">เฉพาะนอกจังหวัด</div>
+                    <div class="text-muted small">
+                        เลือกประเภทการเดินทาง และระบบจะแสดงขั้นตอนการอนุมัติ
+                    </div>
+                </div>
+
+                <div class="row g-3">
+                    <div class="col-12">
+                        <label class="form-label">ประเภทการเดินทาง</label>
+                        <select class="form-select" name="OutTripType" id="OutTripType">
+                            <option value="" selected>-- เลือกประเภท --</option>
+                            <option value="bkk-rayong-metro">
+                                กรณีเดินทางระหว่างจังหวัดระยอง และกรุงเทพฯ/ปริมณฑล (นนทบุรี, สมุทรสาคร, สมุทรปราการ, ฉะเชิงเทรา, ปทุมธานี) รวมถึง ชลบุรี และ พระนครศรีอยุธยา
+                            </option>
+                            <option value="other-province">
+                                กรณีเดินทางไปปฏิบัตงานจังหวัดอื่นๆ
+                            </option>
+                            <option value="special">
+                                กรณีขอใช้รถกรณีพิเศษ (งานอุปสมบท/งานมงคลสมรส) อนุมัติโดย รองกรรมการผู้จัดการ ตามสายงาน
+                            </option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Approval steps preview -->
+                <div class="vb-approval mt-3">
+                    <div class="fw-semibold mb-3">ขั้นตอนการอนุมัติ</div>
+
+                    <div class="vb-steps">
+                        <!-- DM -->
+                        <div class="vb-step">
+                            <div class="vb-step-badge">1</div>
+                            <div class="vb-step-body">
+                                <div class="vb-step-title">DM</div>
+
+                                <div class="vb-approver-card">
+                                    <div class="vb-approver-row">
+                                        <span class="vb-approver-label">รหัสพนักงาน</span>
+                                        <span class="vb-approver-value">26009695</span>
+                                    </div>
+                                    <div class="vb-approver-row">
+                                        <span class="vb-approver-label">ชื่อ-นามสกุล</span>
+                                        <span class="vb-approver-value">Thanadon Prutthisan</span>
+                                    </div>
+                                    <div class="vb-approver-row">
+                                        <span class="vb-approver-label">ตำแหน่ง</span>
+                                        <span class="vb-approver-value">Department Manager</span>
+                                    </div>
+                                    <div class="vb-approver-row">
+                                        <span class="vb-approver-label">หน่วยงาน</span>
+                                        <span class="vb-approver-value">C-OR-DT</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- VP -->
+                        <div class="vb-step">
+                            <div class="vb-step-badge">2</div>
+                            <div class="vb-step-body">
+                                <div class="vb-step-title">VP</div>
+
+                                <div class="vb-approver-card">
+                                    <div class="vb-approver-row">
+                                        <span class="vb-approver-label">รหัสพนักงาน</span>
+                                        <span class="vb-approver-value">26007069</span>
+                                    </div>
+                                    <div class="vb-approver-row">
+                                        <span class="vb-approver-label">ชื่อ-นามสกุล</span>
+                                        <span class="vb-approver-value">Pookrit Chanasinpoondet</span>
+                                    </div>
+                                    <div class="vb-approver-row">
+                                        <span class="vb-approver-label">ตำแหน่ง</span>
+                                        <span class="vb-approver-value">Vice President</span>
+                                    </div>
+                                    <div class="vb-approver-row">
+                                        <span class="vb-approver-label">หน่วยงาน</span>
+                                        <span class="vb-approver-value">C-OR</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- DMD -->
+                        <div class="vb-step">
+                            <div class="vb-step-badge">3</div>
+                            <div class="vb-step-body">
+                                <div class="vb-step-title">DMD</div>
+
+                                <div class="vb-approver-card">
+                                    <div class="vb-approver-row">
+                                        <span class="vb-approver-label">รหัสพนักงาน</span>
+                                        <span class="vb-approver-value">26010243</span>
+                                    </div>
+                                    <div class="vb-approver-row">
+                                        <span class="vb-approver-label">ชื่อ-นามสกุล</span>
+                                        <span class="vb-approver-value">Wiwalya Mangkalakun</span>
+                                    </div>
+                                    <div class="vb-approver-row">
+                                        <span class="vb-approver-label">ตำแหน่ง</span>
+                                        <span class="vb-approver-value">Deputy Managing Director</span>
+                                    </div>
+                                    <div class="vb-approver-row">
+                                        <span class="vb-approver-label">หน่วยงาน</span>
+                                        <span class="vb-approver-value">DCE</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- PERSONAL placeholder -->
+            <div id="vbPersonalPlaceholder" class="vb-personal mt-4">
+                <div class="vb-divider my-3"></div>
+                <div class="alert alert-warning mb-0">
+                    <div class="fw-semibold">ใช้รถส่วนตัว</div>
+                    <div class="small mb-0">ส่วนนี้เว้นไว้ก่อน (สามารถเพิ่ม field/เงื่อนไขภายหลัง)</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Actions -->
+        <div class="d-flex flex-column flex-md-row gap-2 justify-content-end">
+            <button type="button" class="btn btn-light" id="btnReset">ล้างข้อมูล</button>
+            <button type="submit" class="btn btn-primary" id="btnSubmit">
+                ส่งคำขอจอง
+            </button>
+        </div>
+    </form>
+</section>
+
+@section Scripts {
+    <script src="~/js/vehicle-booking.create.js" asp-append-version="true"></script>
+}
