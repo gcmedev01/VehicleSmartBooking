@@ -1,5 +1,5 @@
 ﻿@model VehicleBooking.Web.Domain.Entities.Booking
-@using VehicleBooking.Web.Domain.Enums
+@using VehicleBooking.Web.Domain.Enums 
 @using System.Globalization
 
 @{
@@ -70,7 +70,6 @@
                 : Model.RequesterUserId.ToString();
 
     var requesterCode = Model.Requester?.UserCode ?? "-";
-    var requesterPhone = string.IsNullOrWhiteSpace(Model.RequesterPhone) ? "-" : Model.RequesterPhone;
     var passengers = Model.PassengerCount ?? 1;
     var jobNo = string.IsNullOrWhiteSpace(Model.JobNo) ? "-" : Model.JobNo;
     var costCenter = string.IsNullOrWhiteSpace(Model.CostCenter) ? "-" : Model.CostCenter;
@@ -127,11 +126,6 @@
                 </div>
 
                 <div class="vb-approver-row mb-2">
-                    <div class="vb-approver-label">เบอร์โทรติดต่อ</div>
-                    <div class="vb-approver-value">@requesterPhone</div>
-                </div>
-
-                <div class="vb-approver-row mb-2">
                     <div class="vb-approver-label">ประเภทการเดินทาง</div>
                     <div class="vb-approver-value">@tripTypeText</div>
                 </div>
@@ -173,25 +167,68 @@
                 }
             </div>
 
-            @if (external != null)
+            @if (Model.Status == VehicleBooking.Web.Domain.Enums.BookingStatus.WaitingAdminVendorQuotation)
             {
                 <div class="vb-card p-3 p-md-4 mb-3">
                     <div class="fw-semibold mb-2">Vendor Quote</div>
-                    <div><strong>ผู้ให้บริการ:</strong> @external.VendorName</div>
-                    <div>
-                        <strong>ราคา:</strong>
-                        @(external.QuotedPrice?.ToString("C", new CultureInfo("th-TH")) ?? "-")
+                    <hr />
+                    <form asp-action="SendVendorQuote" asp-route-id="@Model.BookingId" method="post">
+                        @Html.AntiForgeryToken()
+                        <div class="mb-2">
+                            <label class="form-label">ผู้ให้บริการ</label>
+                            <input name="VendorName" class="form-control" value="@(Model.ExternalRental?.VendorName ?? "")" />
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label">ราคา</label>
+                            <input name="QuotedPrice" type="number" step="0.01" class="form-control" value="@(Model.ExternalRental?.QuotedPrice?.ToString() ?? "")" />
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label">หมายเหตุ</label>
+                            <textarea name="Note" class="form-control">@(Model.ExternalRental?.Note ?? "")</textarea>
+                        </div>
+                        <div class="d-flex gap-2 justify-content-end">
+                            <button class="btn btn-ci" type="submit">Send / Update Quote</button>
+                        </div>
+                    </form>
+                </div>
+            }
+            else
+            {
+                if (external != null)
+                {
+                    <div class="vb-card p-3 p-md-4 mb-3">
+                        <div class="fw-semibold mb-2">Vendor Quote</div>
+                        <div><strong>ผู้ให้บริการ:</strong> @external.VendorName</div>
+                        <div>
+                            <strong>ราคา:</strong>
+                            @(external.QuotedPrice?.ToString("C", new CultureInfo("th-TH")) ?? "-")
+                        </div>
+                        <div><strong>หมายเหตุ:</strong> @(string.IsNullOrWhiteSpace(external.Note) ? "-" : external.Note)</div>
                     </div>
-                    <div><strong>หมายเหตุ:</strong> @(string.IsNullOrWhiteSpace(external.Note) ? "-" : external.Note)</div>
-
-                    @if (User?.Identity?.IsAuthenticated == true && User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value == Model.Requester?.UserCode)
-                    {
-                        if (external.UserDecision == VehicleBooking.Web.Domain.Enums.ExternalUserDecision.Pending)
-                        {
-                            <form asp-action="AcceptVendor" asp-route-id="@Model.BookingId" method="post" class="d-inline">@Html.AntiForgeryToken()<button class="btn btn-sm btn-success mt-2">ยอมรับผู้ให้บริการ</button></form>
-                            <form asp-action="RejectVendor" asp-route-id="@Model.BookingId" method="post" class="d-inline ms-2">@Html.AntiForgeryToken()<button class="btn btn-sm btn-outline-danger mt-2">ปฏิเสธผู้ให้บริการ</button></form>
-                        }
-                    }
+                }
+            }
+            @if (Model.Status == VehicleBooking.Web.Domain.Enums.BookingStatus.WaitingAdminVendorConfirm)
+            {
+                <div class="vb-card p-3 p-md-4 mb-3">
+                    <div class="fw-semibold mb-2">รายละเอียดพนักงานขับรถ</div>
+                    <form asp-action="ConfirmVendor" asp-route-id="@Model.BookingId" method="post">
+                        @Html.AntiForgeryToken()
+                        <div class="mb-2">
+                            <label class="form-label">ทะเบียนรถ</label>
+                            <input name="RentalPlateNo" class="form-control" value="@(Model.ExternalRental?.RentalPlateNo ?? "")" />
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label">รายชื่อพนักงานขับรถ</label>
+                            <input name="RentalDriverName" class="form-control" value="@(Model.ExternalRental?.RentalDriverName ?? "")" />
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label">เบอร์โทรพนักงานขับรถ</label>
+                            <input name="RentalDriverPhone" class="form-control" value="@(Model.ExternalRental?.RentalDriverPhone ?? "")" />
+                        </div>
+                        <div class="d-flex gap-2 justify-content-end">
+                            <button class="btn btn-success" type="submit">Confirm</button>
+                        </div>
+                    </form>
                 </div>
             }
 
@@ -334,8 +371,15 @@
                 <div class="vb-divider my-3"></div>
 
                 <div class="d-flex justify-content-end">
-                    <a asp-action="MyBookings" class="btn btn-light">
-                        Back
+                    @if (Model.Status == VehicleBooking.Web.Domain.Enums.BookingStatus.AdminActionRequired)
+                    {
+                        <form asp-action="ForceComplete" asp-route-id="@Model.BookingId" method="post">
+                            @Html.AntiForgeryToken()
+                            <button class="btn btn-success">จบงาน</button>
+                        </form>
+                    }
+                    <a asp-action="AllBookings" class="btn btn-light ms-2">
+                        ย้อนกลับ
                     </a>
                 </div>
             </div>

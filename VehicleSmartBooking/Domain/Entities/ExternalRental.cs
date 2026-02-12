@@ -13,6 +13,8 @@ public sealed class ExternalRental
     public ExternalUserDecision UserDecision { get; set; } = ExternalUserDecision.Pending;
     public DateTime? UserDecisionAtUtc { get; set; }
 
+    public string? Note { get; set; } // vendor note / admin note
+
     public string? RentalPlateNo { get; set; }
     public string? RentalDriverName { get; set; }
     public string? RentalDriverPhone { get; set; }

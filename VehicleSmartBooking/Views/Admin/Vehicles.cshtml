@@ -1,0 +1,58 @@
+@model IList<VehicleBooking.Web.Domain.Entities.Vehicle>
+@{
+    Layout = "_VehicleBookingLayout";
+    ViewData["Title"] = "Vehicles";
+    ViewData["ActiveNav"] = "AdminVehicles";
+}
+
+<div class="vb-page-head vb-page-hero mb-4">
+    <div class="vb-page-title">
+        <div class="vb-page-icon">??</div>
+        <div>
+            <h1 class="vb-page-h1">Vehicles</h1>
+            <div class="vb-page-sub">Manage company vehicles</div>
+        </div>
+    </div>
+</div>
+
+<div class="d-flex justify-content-end mb-3">
+    <a asp-action="VehicleCreate" class="btn btn-ci">Create Vehicle</a>
+</div>
+
+<div class="vb-card p-3">
+    @if (Model == null || !Model.Any())
+    {
+        <div class="text-muted">No vehicles</div>
+    }
+    else
+    {
+        <div class="table-responsive">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Plate</th>
+                        <th>Type</th>
+                        <th>Status</th>
+                        <th>Driver</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach(var v in Model)
+                    {
+                        <tr>
+                            <td>@v.PlateNo</td>
+                            <td>@v.VehicleType</td>
+                            <td>@v.Status</td>
+                            <td>@(v.Driver?.User?.UsernameTH ?? v.Driver?.User?.UsernameEN ?? "-")</td>
+                            <td class="text-end">
+                                <a asp-action="VehicleEdit" asp-route-id="@v.VehicleId" class="btn btn-sm btn-outline-secondary">Edit</a>
+                                <form asp-action="VehicleDelete" asp-route-id="@v.VehicleId" method="post" class="d-inline">@Html.AntiForgeryToken()<button class="btn btn-sm btn-danger">Deactivate</button></form>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>

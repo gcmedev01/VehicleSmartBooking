@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System.ComponentModel.DataAnnotations;
 using System.Security.Claims;
+using System.Text.Json;
 using VehicleBooking.Web.Data;
 using VehicleBooking.Web.Domain.Auth;
 using VehicleBooking.Web.Domain.Entities;
@@ -40,7 +41,7 @@ namespace VehicleSmartBooking.Controllers
         {
             ViewData["Title"] = "Sign In";
             ViewData["ReturnUrl"] = returnUrl;
-            return View(); // ใช้หน้าเดิมของคุณได้
+            return View("~/Views/Login/Index.cshtml");
         }
 
         // POST: /account/login (Local login for Driver)
@@ -53,7 +54,7 @@ namespace VehicleSmartBooking.Controllers
             ViewData["ReturnUrl"] = returnUrl;
 
             if (!ModelState.IsValid)
-                return View(vm);
+                return View("~/Views/Login/Index.cshtml", vm);
 
             var username = (vm.Username ?? "").Trim();
             var password = vm.Password ?? "";
@@ -65,13 +66,13 @@ namespace VehicleSmartBooking.Controllers
             if (cred is null || cred.User is null || !cred.User.IsActive)
             {
                 ModelState.AddModelError(string.Empty, "Username or password is invalid.");
-                return View(vm);
+                return View("~/Views/Login/Index.cshtml", vm);
             }
 
             if (cred.IsLocked)
             {
                 ModelState.AddModelError(string.Empty, "Account is locked. Please contact admin.");
-                return View(vm);
+                return View("~/Views/Login/Index.cshtml", vm);
             }
 
             var ok = _hasher.Verify(password, cred.PasswordHash, cred.PasswordSalt, cred.Iterations, cred.PasswordAlgo);
@@ -88,7 +89,7 @@ namespace VehicleSmartBooking.Controllers
                 await _db.SaveChangesAsync();
 
                 ModelState.AddModelError(string.Empty, "Username or password is invalid.");
-                return View(vm);
+                return View("~/Views/Login/Index.cshtml", vm);
             }
 
             // success => reset fail counters
@@ -107,6 +108,28 @@ namespace VehicleSmartBooking.Controllers
             var principal = ClaimsFactory.Create(user); // ✅ ใช้ของคุณเลย
             await HttpContext.SignInAsync(principal);
 
+            // refresh session cache to avoid stale user data
+            try
+            {
+                HttpContext.Session.Clear();
+                var sessionObj = new Dictionary<string, object?>
+                {
+                    ["UserCode"] = user.UserCode,
+                    ["UserId"] = user.UserId,
+                    ["UsernameEN"] = user.UsernameEN,
+                    ["UsernameTH"] = user.UsernameTH,
+                    ["DisplayName"] = !string.IsNullOrWhiteSpace(user.UsernameTH) ? user.UsernameTH : (user.UsernameEN ?? user.UserCode),
+                    ["RoleFlags"] = user.RoleFlags
+                };
+
+                var json = JsonSerializer.Serialize(sessionObj);
+                HttpContext.Session.SetString("CurrentUser", json);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to write user info into session for UserCode={UserCode}", user.UserCode);
+            }
+
             // ถ้าเป็น driver และยังไม่เคยเปลี่ยนรหัส -> บังคับไปเปลี่ยน
             // RoleFlags ของคุณเป็น int (ไม่ใช่ nullable)
             var roleFlags = user.RoleFlags;
@@ -119,11 +142,7 @@ namespace VehicleSmartBooking.Controllers
                 }
             }
 
-            // returnUrl
-            if (!string.IsNullOrWhiteSpace(returnUrl) && Url.IsLocalUrl(returnUrl))
-                return Redirect(returnUrl);
-
-            return RedirectAfterLogin(roleFlags);
+            return RedirectAfterLogin(user);
         }
 
         // GET: /account/change-password
@@ -134,7 +153,9 @@ namespace VehicleSmartBooking.Controllers
             var me = await ResolveCurrentUserAsync();
             if (me is null) return Forbid();
 
+            var cred = await _db.UserCredentials.AsNoTracking().SingleOrDefaultAsync(x => x.UserId == me.UserId);
             ViewData["Title"] = "Change Password";
+            ViewBag.RequireCurrentPassword = cred?.PasswordChangedAtUtc != null;
             return View(new ChangePasswordVm());
         }
 
@@ -148,6 +169,11 @@ namespace VehicleSmartBooking.Controllers
             if (me is null) return Forbid();
 
             ViewData["Title"] = "Change Password";
+
+            var cred = await _db.UserCredentials.SingleOrDefaultAsync(x => x.UserId == me.UserId);
+            if (cred is null) return Forbid();
+
+            ViewBag.RequireCurrentPassword = cred.PasswordChangedAtUtc != null;
 
             if (!ModelState.IsValid)
                 return View(vm);
@@ -163,9 +189,6 @@ namespace VehicleSmartBooking.Controllers
                 ModelState.AddModelError(nameof(vm.ConfirmPassword), "Password confirmation does not match.");
                 return View(vm);
             }
-
-            var cred = await _db.UserCredentials.SingleOrDefaultAsync(x => x.UserId == me.UserId);
-            if (cred is null) return Forbid();
 
             // ถ้าเคยเปลี่ยนแล้ว => ต้องใส่ current password ให้ถูก
             if (cred.PasswordChangedAtUtc != null)
@@ -193,7 +216,7 @@ namespace VehicleSmartBooking.Controllers
 
             await _db.SaveChangesAsync();
 
-            return RedirectAfterLogin(me.RoleFlags);
+            return RedirectAfterLogin(me);
         }
 
         // POST: /account/logout (layout คุณเรียก Account/Logout)
@@ -201,20 +224,35 @@ namespace VehicleSmartBooking.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Logout()
         {
+            try
+            {
+                HttpContext.Session.Clear();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to clear session during logout.");
+            }
+
             await HttpContext.SignOutAsync();
             return RedirectToAction("Index", "Home");
         }
 
         // ---------------- helpers ----------------
-        private IActionResult RedirectAfterLogin(int roleFlags)
+        private IActionResult RedirectAfterLogin(User user)
         {
-            bool isAdmin = (roleFlags & ROLE_ADMIN) == ROLE_ADMIN;
+            var roleFlags = user.RoleFlags;
             bool isDriver = (roleFlags & ROLE_DRIVER) == ROLE_DRIVER;
-            bool isApprover = (roleFlags & ROLE_APPROVER) == ROLE_APPROVER;
 
-            if (isAdmin) return RedirectToAction("Fleet", "Admin");
-            if (isDriver) return RedirectToAction("Dashboard", "Driver");
-            if (isApprover) return RedirectToAction("Index", "Approvals");
+            if (isDriver)
+            {
+                var hasDriverProfile = _db.Drivers.AsNoTracking().Any(d => d.UserId == user.UserId && d.IsActive);
+                if (hasDriverProfile)
+                {
+                    return RedirectToAction("MyJobs", "Driver");
+                }
+
+                return RedirectToAction("NotPermission", "Home");
+            }
 
             return RedirectToAction("Create", "Booking");
         }

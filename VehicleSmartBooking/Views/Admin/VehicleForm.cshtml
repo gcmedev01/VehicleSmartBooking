@@ -1,0 +1,54 @@
+@model VehicleSmartBooking.Controllers.AdminController.VehicleVm
+@{
+    Layout = "_VehicleBookingLayout";
+    ViewData["Title"] = Model.VehicleId == 0 ? "Create Vehicle" : "Edit Vehicle";
+}
+
+<div class="vb-page-head vb-page-hero mb-4">
+    <div class="vb-page-title">
+        <div class="vb-page-icon">??</div>
+        <div>
+            <h1 class="vb-page-h1">@ViewData["Title"]</h1>
+        </div>
+    </div>
+</div>
+
+<div class="vb-card p-3">
+    <form method="post" asp-action="@(Model.VehicleId == 0 ? "VehicleCreate" : "VehicleEdit")" asp-route-id="@Model.VehicleId">
+        @Html.AntiForgeryToken()
+        <div class="row g-3">
+            <div class="col-md-6">
+                <label class="form-label">Plate No</label>
+                <input asp-for="PlateNo" class="form-control" />
+                <span class="text-danger small">@Html.ValidationMessageFor(m => m.PlateNo)</span>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Type</label>
+                <select asp-for="VehicleType" class="form-select">
+                    <option value="1">Sedan</option>
+                    <option value="2">Pickup</option>
+                    <option value="3">Van</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Status</label>
+                <select asp-for="Status" class="form-select">
+                    <option value="1">Available</option>
+                    <option value="2">Maintenance</option>
+                    <option value="3">OutOfService</option>
+                </select>
+            </div>
+            <div class="col-12 mt-2">
+                <div class="form-check">
+                    <input asp-for="IsActive" class="form-check-input" />
+                    <label class="form-check-label">Active</label>
+                </div>
+            </div>
+        </div>
+
+        <div class="d-flex justify-content-end mt-4">
+            <a asp-action="Vehicles" class="btn btn-light">Cancel</a>
+            <button class="btn btn-primary">Save</button>
+        </div>
+    </form>
+</div>

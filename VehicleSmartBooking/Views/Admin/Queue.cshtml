@@ -1,0 +1,284 @@
+﻿@model VehicleSmartBooking.Controllers.BookingController.QueueVm
+@using VehicleBooking.Web.Domain.Enums
+@using System.Text.Json
+
+@{
+    Layout = "_VehicleBookingLayout";
+    ViewData["Title"] = "Vehicle Queue";
+    ViewData["ActiveNav"] = "Queue";
+
+    if (Model == null)
+    {
+        return;
+    }
+
+    var monthStart = Model.StartDate.Date;
+    var monthEnd = monthStart.AddMonths(1);
+    var daysInMonth = Model.Days;
+    var prevMonth = monthStart.AddMonths(-1);
+    var nextMonth = monthStart.AddMonths(1);
+
+    var queueData = Model.Vehicles.Select(v => new
+    {
+        vehicleId = v.Vehicle.VehicleId,
+        plate = v.Vehicle.PlateNo,
+        type = v.Vehicle.VehicleType.ToString(),
+        isExternalVehicle = v.Vehicle.VehicleId < 0 || v.Vehicle.PlateNo == "รถภายนอก",
+        slots = v.Slots.Select(s => new
+        {
+            bookingId = s.BookingId,
+            start = s.StartLocal.ToString("O"),
+            end = s.EndLocal.ToString("O"),
+            requester = s.RequesterName ?? "",
+            label = s.DisplayLabel ?? v.Vehicle.PlateNo,
+            isExternal = s.IsExternalRental
+        })
+    }).ToList();
+
+    var json = JsonSerializer.Serialize(queueData, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
+}
+
+<div class="vb-queue-page">
+    <div class="vb-page-head vb-page-hero mb-4">
+        <div class="vb-page-title">
+            <div class="vb-page-icon">📅</div>
+            <div>
+                <h1 class="vb-page-h1">Vehicle Queue</h1>
+                <div class="vb-page-sub">ตรวจสอบการจองรถตามวันและช่วงเวลา</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="vb-card p-3 p-md-4 mb-3">
+        <div class="fw-semibold mb-2">เลือกประเภทรถ</div>
+        <div class="vb-queue-filter mb-3" id="typeFilters"></div>
+
+        <div id="vehicleFilterSection">
+            <div class="fw-semibold mb-2">เลือกรถ</div>
+            <div class="vb-queue-filter" id="vehicleFilters"></div>
+        </div>
+    </div>
+
+    <div class="vb-card p-3 p-md-4 mb-3 d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-2">
+        <div class="fw-semibold">@monthStart.ToString("MMMM yyyy")</div>
+        <div class="d-flex flex-wrap align-items-center gap-2">
+            <div class="d-flex gap-2">
+                <a class="btn btn-light" asp-action="Queue" asp-route-startDate="@prevMonth.ToString("yyyy-MM-01")">Previous</a>
+                <a class="btn btn-light" asp-action="Queue" asp-route-startDate="@nextMonth.ToString("yyyy-MM-01")">Next</a>
+            </div>
+        </div>
+    </div>
+
+    <div class="vb-card p-3 p-md-4">
+        <div class="vb-calendar-head">
+            <div class="vb-calendar-legend">
+                <div class="vb-legend-item">เลือกประเภทรถและรถที่ต้องการ แล้วดูตาราง</div>
+                <div class="vb-legend-item">
+                    <span class="vb-queue-legend-dot vb-queue-legend-pickup"></span> รถกระบะ
+                </div>
+                <div class="vb-legend-item">
+                    <span class="vb-queue-legend-dot vb-queue-legend-van"></span> รถตู้
+                </div>
+                <div class="vb-legend-item">
+                    <span class="vb-queue-legend-dot vb-queue-legend-sedan"></span> รถเก๋ง
+                </div>
+            </div>
+        </div>
+
+        <div class="vb-queue-calendar" id="queueCalendar"></div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        const queueData = @Html.Raw(json);
+        const monthStart = new Date("@monthStart.ToString("yyyy-MM-01")T00:00:00");
+        const daysInMonth = @daysInMonth;
+
+        const typeFiltersEl = document.getElementById("typeFilters");
+        const vehicleFiltersEl = document.getElementById("vehicleFilters");
+        const vehicleFilterSection = document.getElementById("vehicleFilterSection");
+        const calendarEl = document.getElementById("queueCalendar");
+
+        const types = Array.from(new Set(queueData.map(v => v.type)));
+        const selectedTypes = new Set(types);
+        const selectedVehicles = new Set(queueData.map(v => v.vehicleId));
+
+        function getTypeLabel(type) {
+            switch (type) {
+                case "Pickup":
+                    return "รถกระบะ";
+                case "Van":
+                    return "รถตู้";
+                case "Sedan":
+                    return "รถเก๋ง";
+                default:
+                    return type;
+            }
+        }
+
+        function renderTypeFilters() {
+            typeFiltersEl.innerHTML = "";
+            types.forEach(type => {
+                const btn = document.createElement("button");
+                btn.type = "button";
+                btn.className = `btn btn-outline-secondary ${selectedTypes.has(type) ? "is-active" : ""}`;
+                btn.textContent = getTypeLabel(type);
+                btn.addEventListener("click", () => {
+                    if (selectedTypes.has(type)) {
+                        selectedTypes.delete(type);
+                    } else {
+                        selectedTypes.add(type);
+                    }
+                    syncVehiclesWithTypes();
+                    renderTypeFilters();
+                    renderVehicleFilters();
+                    renderCalendar();
+                });
+                typeFiltersEl.appendChild(btn);
+            });
+        }
+
+        function syncVehiclesWithTypes() {
+            selectedVehicles.clear();
+            queueData.forEach(v => {
+                if (selectedTypes.has(v.type)) {
+                    selectedVehicles.add(v.vehicleId);
+                }
+            });
+        }
+
+        function renderVehicleFilters() {
+            if (selectedTypes.size === 0) {
+                vehicleFilterSection.style.display = "none";
+                vehicleFiltersEl.innerHTML = "";
+                return;
+            }
+
+            vehicleFilterSection.style.display = "block";
+            vehicleFiltersEl.innerHTML = "";
+            const grouped = {};
+            queueData
+                .filter(v => selectedTypes.has(v.type) && !v.isExternalVehicle)
+                .forEach(v => {
+                    if (!grouped[v.type]) grouped[v.type] = [];
+                    grouped[v.type].push(v);
+                });
+
+            Object.keys(grouped).sort().forEach(type => {
+                const row = document.createElement("div");
+                row.className = "vb-queue-vehicle-row";
+
+                const label = document.createElement("div");
+                label.className = "vb-queue-vehicle-label";
+                label.textContent = getTypeLabel(type);
+                row.appendChild(label);
+
+                const buttons = document.createElement("div");
+                buttons.className = "vb-queue-filter";
+
+                grouped[type].forEach(v => {
+                    const btn = document.createElement("button");
+                    btn.type = "button";
+                    btn.className = `btn btn-outline-secondary ${selectedVehicles.has(v.vehicleId) ? "is-active" : ""}`;
+                    btn.textContent = v.plate;
+                    btn.addEventListener("click", () => {
+                        if (selectedVehicles.has(v.vehicleId)) {
+                            selectedVehicles.delete(v.vehicleId);
+                        } else {
+                            selectedVehicles.add(v.vehicleId);
+                        }
+                        renderVehicleFilters();
+                        renderCalendar();
+                    });
+                    buttons.appendChild(btn);
+                });
+
+                row.appendChild(buttons);
+                vehicleFiltersEl.appendChild(row);
+            });
+        }
+
+        function renderCalendar() {
+            calendarEl.innerHTML = "";
+
+            const firstDay = new Date(monthStart);
+            const startDayOfWeek = (firstDay.getDay() + 6) % 7; // Monday=0
+
+            const totalCells = Math.ceil((startDayOfWeek + daysInMonth) / 7) * 7;
+
+            for (let i = 0; i < totalCells; i++) {
+                const dayOffset = i - startDayOfWeek;
+                const cellDate = new Date(monthStart);
+                cellDate.setDate(monthStart.getDate() + dayOffset);
+
+                const isCurrentMonth = dayOffset >= 0 && dayOffset < daysInMonth;
+                const cell = document.createElement("div");
+                cell.className = `vb-queue-day ${isCurrentMonth ? "" : "is-muted"}`;
+
+                const title = document.createElement("div");
+                title.className = "vb-queue-day-title";
+                title.textContent = cellDate.getDate();
+                cell.appendChild(title);
+
+                if (isCurrentMonth) {
+                    const dayStart = new Date(cellDate);
+                    dayStart.setHours(0,0,0,0);
+                    const dayEnd = new Date(cellDate);
+                    dayEnd.setHours(23,59,59,999);
+
+                    const slots = [];
+                    queueData.forEach(v => {
+                        if (!selectedVehicles.has(v.vehicleId)) return;
+                        v.slots.forEach(s => {
+                            const start = new Date(s.start);
+                            const end = new Date(s.end);
+                            if (start < dayEnd && end > dayStart) {
+                                slots.push({
+                                    bookingId: s.bookingId,
+                                    requester: s.requester,
+                                    start,
+                                    end,
+                                    plate: v.plate,
+                                    label: s.label,
+                                    type: v.type
+                                });
+                            }
+                        });
+                    });
+
+                    slots.sort((a,b) => a.start - b.start);
+
+                    slots.forEach(slot => {
+                        const block = document.createElement("div");
+                        block.className = "vb-queue-slot";
+                        block.style.cursor = "pointer";
+                        block.addEventListener("click", () => {
+                            window.open(`/Admin/Detail/${slot.bookingId}`, "_blank");
+                        });
+
+                        const typeColor = slot.type === "Pickup" ? "rgba(11,94,215,.12)" :
+                                          slot.type === "Van" ? "rgba(32,201,151,.14)" :
+                                          "rgba(255,193,7,.16)";
+                        const typeBorder = slot.type === "Pickup" ? "rgba(11,94,215,.35)" :
+                                           slot.type === "Van" ? "rgba(32,201,151,.35)" :
+                                           "rgba(255,193,7,.4)";
+
+                        block.style.background = typeColor;
+                        block.style.border = `1px solid ${typeBorder}`;
+
+                        const time = `${slot.start.toLocaleTimeString([], {hour:"2-digit", minute:"2-digit"})} - ${slot.end.toLocaleTimeString([], {hour:"2-digit", minute:"2-digit"})}`;
+                        block.innerHTML = `<div><strong>VS-${slot.bookingId}</strong> (${slot.label})</div><div class="vb-queue-meta">${time}</div><div class="vb-queue-meta">${slot.requester}</div>`;
+                        cell.appendChild(block);
+                    });
+                }
+
+                calendarEl.appendChild(cell);
+            }
+        }
+
+        renderTypeFilters();
+        renderVehicleFilters();
+        renderCalendar();
+    </script>
+}

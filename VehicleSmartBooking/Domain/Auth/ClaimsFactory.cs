@@ -27,11 +27,18 @@ public static class ClaimsFactory
         new Claim("DisplayName", user.UsernameEN ?? user.UsernameTH ?? user.UserCode),
     };
 
-        // map RoleFlags -> role claims
-        if ((user.RoleFlags & ROLE_USER) != 0) claims.Add(new Claim(ClaimTypes.Role, "User"));
-        if ((user.RoleFlags & ROLE_ADMIN) != 0) claims.Add(new Claim(ClaimTypes.Role, "Admin"));
-        if ((user.RoleFlags & ROLE_DRIVER) != 0) claims.Add(new Claim(ClaimTypes.Role, "Driver"));
-        if ((user.RoleFlags & ROLE_APPROVER) != 0) claims.Add(new Claim(ClaimTypes.Role, "Approver"));
+        var isDriver = (user.RoleFlags & ROLE_DRIVER) != 0;
+        if (isDriver)
+        {
+            claims.Add(new Claim(ClaimTypes.Role, "Driver"));
+        }
+        else
+        {
+            // map RoleFlags -> role claims
+            if ((user.RoleFlags & ROLE_USER) != 0) claims.Add(new Claim(ClaimTypes.Role, "User"));
+            if ((user.RoleFlags & ROLE_ADMIN) != 0) claims.Add(new Claim(ClaimTypes.Role, "Admin"));
+            if ((user.RoleFlags & ROLE_APPROVER) != 0) claims.Add(new Claim(ClaimTypes.Role, "Approver"));
+        }
 
         var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
         return new ClaimsPrincipal(identity);

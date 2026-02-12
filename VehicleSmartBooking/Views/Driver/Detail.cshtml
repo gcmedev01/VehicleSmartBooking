@@ -1,0 +1,263 @@
+﻿@using VehicleBooking.Web.Domain.Entities
+@using VehicleBooking.Web.Domain.Enums
+@model Booking
+
+@{
+    Layout = "_VehicleBookingLayout";
+    ViewData["Title"] = "Driver Job";
+
+    string StatusClass(BookingStatus st) => st switch
+    {
+        BookingStatus.WaitingDriverAccept => "vb-status-pending",
+        BookingStatus.DriverAccepted => "vb-status-approved",
+        BookingStatus.Completed => "vb-status-completed",
+        BookingStatus.Rated => "vb-status-completed",
+        BookingStatus.Rejected => "vb-status-rejected",
+        BookingStatus.Cancelled => "vb-status-rejected",
+        BookingStatus.VendorRejectedByUser => "vb-status-rejected",
+        _ => "vb-status-pending"
+    };
+
+    string StatusText(BookingStatus st) => st switch
+    {
+        BookingStatus.WaitingDriverAccept => "รอพนักงานขับรถตอบรับ",
+        BookingStatus.DriverAccepted => "พนักงานขับรถตอบรับ",
+        BookingStatus.Completed => "เสร็จสิ้น",
+        BookingStatus.Rated => "ให้คะแนนแล้ว",
+        BookingStatus.Rejected => "ถูกปฏิเสธ",
+        BookingStatus.Cancelled => "ยกเลิก",
+        BookingStatus.VendorRejectedByUser => "ผู้ขอใช้ปฏิเสธผู้ให้บริการ",
+        _ => st.ToString()
+    };
+
+    string VehicleText(VehicleType v) => v switch
+    {
+        VehicleType.Pickup => "รถกระบะ",
+        VehicleType.Van => "รถตู้",
+        VehicleType.Sedan => "รถเก๋ง",
+        _ => v.ToString()
+    };
+
+    string TripText(TripType t) => t switch
+    {
+        TripType.InProvince => "ในจังหวัด",
+        TripType.OutProvince => "นอกจังหวัด",
+        _ => t.ToString()
+    };
+
+    bool CanAccept(BookingStatus st) => st == BookingStatus.WaitingDriverAccept;
+    bool CanComplete(BookingStatus st) => st == BookingStatus.DriverAccepted;
+
+    var requesterName = !string.IsNullOrWhiteSpace(Model.Requester?.UsernameTH) ? Model.Requester.UsernameTH : (Model.Requester?.UsernameEN ?? Model.RequesterUserId.ToString());
+    var requesterCode = Model.Requester?.UserCode ?? "-";
+    var requesterEmail = Model.Requester?.Email ?? "-";
+    var requesterPhone = string.IsNullOrWhiteSpace(Model.RequesterPhone) ? "-" : Model.RequesterPhone;
+    var startLocal = Model.StartAtUtc.ToLocalTime();
+    var endLocal = Model.EndAtUtc.ToLocalTime();
+
+    var jobNo = string.IsNullOrWhiteSpace(Model.JobNo) ? "-" : Model.JobNo;
+    var costCenter = string.IsNullOrWhiteSpace(Model.CostCenter) ? "-" : Model.CostCenter;
+    var soNo = string.IsNullOrWhiteSpace(Model.SONo) ? "-" : Model.SONo;
+    var passengerCount = Model.PassengerCount ?? 1;
+
+    var assignedVehiclePlate = Model.AssignedVehicle != null ? Model.AssignedVehicle.PlateNo : (Model.AssignedVehicleId.HasValue ? $"#{Model.AssignedVehicleId}" : "-");
+    var statusText = StatusText(Model.Status);
+    var tripTypeText = TripText(Model.TripType);
+    var vehicleTypeText = VehicleText(Model.VehicleTypeRequested);
+}
+
+<div class="vb-page-head vb-page-hero mb-4">
+    <div class="vb-page-title">
+        <div class="vb-page-icon">🚗</div>
+        <div>
+            <h1 class="vb-page-h1">Driver Job</h1>
+            <div class="vb-page-sub">รายละเอียดงานที่มอบหมาย</div>
+        </div>
+    </div>
+
+    <div class="vb-page-meta d-none d-md-flex">
+        <span class="vb-meta-pill">Driver</span>
+        <span class="vb-meta-pill">Job</span>
+    </div>
+</div>
+
+<div class="row g-3">
+    <div class="col-12 col-md-4">
+        <div class="vb-card p-3 p-md-4 mb-3">
+            <div class="fw-semibold mb-3">Request Info</div>
+
+            <div class="vb-approver-row mb-2">
+                <div class="vb-approver-label">ผู้ขอใช้รถ</div>
+                <div class="vb-approver-value">@requesterName</div>
+            </div>
+
+            <div class="vb-approver-row mb-2">
+                <div class="vb-approver-label">รหัสพนักงาน</div>
+                <div class="vb-approver-value">@requesterCode</div>
+            </div>
+
+            <div class="vb-approver-row mb-2">
+                <div class="vb-approver-label">ประเภทการเดินทาง</div>
+                <div class="vb-approver-value">@tripTypeText</div>
+            </div>
+
+            <div class="vb-approver-row mb-2">
+                <div class="vb-approver-label">ประเภทรถ</div>
+                <div class="vb-approver-value">@vehicleTypeText</div>
+            </div>
+
+            <div class="vb-approver-row mb-2">
+                <div class="vb-approver-label">จำนวนผู้โดยสาร</div>
+                <div class="vb-approver-value">@passengerCount</div>
+            </div>
+
+            <div class="vb-approver-row">
+                <div class="vb-approver-label">สถานะ</div>
+                <div class="vb-approver-value">@statusText</div>
+            </div>
+        </div>
+
+        <div class="vb-card p-3 p-md-4 mb-3">
+            <div class="fw-semibold mb-2">ข้อมูลติดต่อผู้ร้องขอ</div>
+            <div class="text-muted small">@requesterName</div>
+            <div class="text-muted small">@requesterPhone</div>
+            <div class="text-muted small">@requesterEmail</div>
+        </div>
+
+        <div class="vb-card p-3 p-md-4 mb-3">
+            <div class="fw-semibold mb-2">Attachments</div>
+
+            @if (Model.Attachments?.Any() == true)
+            {
+                <ul class="list-unstyled mb-0">
+                    @foreach (var a in Model.Attachments)
+                    {
+                        <li class="mb-1">
+                            <a href="@a.StoragePath" target="_blank">@a.FileName</a>
+                        </li>
+                    }
+                </ul>
+            }
+            else
+            {
+                <div class="text-muted">ไม่มีเอกสารแนบ</div>
+            }
+        </div>
+    </div>
+
+    <div class="col-12 col-md-8">
+        <div class="vb-card p-3 p-md-4 mb-3">
+            <div class="d-flex justify-content-between align-items-start">
+                <div>
+                    <div class="fw-semibold">Route & Schedule</div>
+                    <div class="text-muted small">รายละเอียดการเดินทาง</div>
+                </div>
+                <div class="text-end">
+                    <div class="fw-semibold">VS-@Model.BookingId</div>
+                    <div class="text-muted small">@startLocal.ToString("dd/MM/yyyy HH:mm")</div>
+                </div>
+            </div>
+
+            <div class="vb-divider my-3"></div>
+
+            <div class="mb-2">
+                <div class="fw-semibold">จาก</div>
+                <div class="text-muted">@Model.PickupLocation</div>
+            </div>
+
+            <div class="mb-2">
+                <div class="fw-semibold">ถึง</div>
+                <div class="text-muted">@Model.DestinationLocation</div>
+            </div>
+
+            <div class="row g-2 mt-3">
+                <div class="col-6">
+                    <div class="fw-semibold">เริ่มต้น</div>
+                    <div class="text-muted">@startLocal.ToString("dd/MM/yyyy HH:mm")</div>
+                </div>
+                <div class="col-6">
+                    <div class="fw-semibold">สิ้นสุด</div>
+                    <div class="text-muted">@endLocal.ToString("dd/MM/yyyy HH:mm")</div>
+                </div>
+            </div>
+
+            <div class="vb-divider my-3"></div>
+
+            <div class="row g-2">
+                <div class="col-md-4">
+                    <div class="fw-semibold">Job No</div>
+                    <div class="text-muted">@jobNo</div>
+                </div>
+                <div class="col-md-4">
+                    <div class="fw-semibold">Cost Center</div>
+                    <div class="text-muted">@costCenter</div>
+                </div>
+                <div class="col-md-4">
+                    <div class="fw-semibold">SO No</div>
+                    <div class="text-muted">@soNo</div>
+                </div>
+            </div>
+
+            <div class="vb-divider my-3"></div>
+
+            <div class="row g-2">
+                <div class="col-md-6">
+                    <div class="fw-semibold">ทะเบียนรถ</div>
+                    <div class="text-muted">@assignedVehiclePlate</div>
+                </div>
+                <div class="col-md-6">
+                    <div class="fw-semibold">สถานะ</div>
+                    <div class="text-muted">
+                        <span class="vb-status @StatusClass(Model.Status)">@statusText</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="vb-divider my-3"></div>
+
+            <div>
+                <div class="fw-semibold">วัตถุประสงค์</div>
+                <div class="text-muted">@Model.Purpose</div>
+            </div>
+
+            <div class="vb-divider my-3"></div>
+
+            <div class="d-flex gap-2 flex-wrap justify-content-end">
+                <a asp-controller="Driver" asp-action="MyJobs" class="btn btn-outline-secondary">กลับหน้ารายการ</a>
+
+                @if (CanAccept(Model.Status))
+                {
+                    <form asp-controller="Driver" asp-action="Accept" asp-route-id="@Model.BookingId" method="post" class="m-0">
+                        @Html.AntiForgeryToken()
+                        <button type="submit" class="btn btn-success">รับงาน</button>
+                    </form>
+
+                    <button type="button" class="btn btn-outline-danger" data-bs-toggle="collapse" data-bs-target="#declineBox" aria-expanded="false" aria-controls="declineBox">ปฏิเสธงาน</button>
+                }
+                else if (CanComplete(Model.Status))
+                {
+                    <form asp-controller="Driver" asp-action="Complete" asp-route-id="@Model.BookingId" method="post" class="m-0">
+                        @Html.AntiForgeryToken()
+                        <button type="submit" class="btn btn-success">จบงาน</button>
+                    </form>
+                }
+            </div>
+
+            @if (CanAccept(Model.Status))
+            {
+                <div class="collapse mt-3" id="declineBox">
+                    <div class="vb-card p-3" style="background:#fff;">
+                        <div class="fw-semibold mb-2">เหตุผลที่ปฏิเสธ (ถ้ามี)</div>
+                        <form asp-controller="Driver" asp-action="Decline" asp-route-id="@Model.BookingId" method="post" class="m-0">
+                            @Html.AntiForgeryToken()
+                            <textarea name="reason" class="form-control" rows="3" placeholder="พิมพ์สั้น ๆ..."></textarea>
+                            <div class="d-flex justify-content-end mt-2">
+                                <button type="submit" class="btn btn-outline-danger">ยืนยันปฏิเสธ</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+</div>

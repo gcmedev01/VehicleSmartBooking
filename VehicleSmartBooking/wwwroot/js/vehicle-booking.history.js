@@ -5,7 +5,7 @@
     const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
 
     const hisSearch = $("#hisSearch");
-    const hisRange = $("#hisRange");
+    const hisVehicle = $("#hisVehicle");
     const hisStatus = $("#hisStatus");
     const hisClear = $("#hisClear");
 
@@ -15,38 +15,20 @@
 
     const countAll = $("#hisCountAll");
     const countPending = $("#hisCountPending");
-    const countApproved = $("#hisCountApproved");
+    const countCompleted = $("#hisCountCompleted");
     const countBad = $("#hisCountBad");
 
-    if (!hisSearch && !hisRange && !hisStatus && items.length === 0) return;
+    if (!hisSearch && !hisVehicle && !hisStatus && items.length === 0) return;
 
-    const PENDING_SET = new Set(["Submitted", "WaitingApproval"]);
-    const APPROVED_SET = new Set(["Approved", "Completed"]);
+    const COMPLETED_SET = new Set(["Completed", "Rated"]);
     const BAD_SET = new Set(["Rejected", "Cancelled"]);
-
-    function parseDateYYYYMMDD(s) {
-        if (!s) return null;
-        const d = new Date(`${s}T00:00:00`);
-        return isNaN(d.getTime()) ? null : d;
-    }
-
-    function withinRange(itemDate, rangeVal) {
-        if (!itemDate) return true;
-        if (!rangeVal || rangeVal === "all") return true;
-
-        const days = parseInt(rangeVal, 10);
-        if (isNaN(days)) return true;
-
-        const now = new Date();
-        const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-        const cutoff = new Date(todayStart);
-        cutoff.setDate(todayStart.getDate() - days);
-
-        return itemDate >= cutoff;
-    }
 
     function norm(s) {
         return (s || "").toString().trim().toLowerCase();
+    }
+
+    function isPendingStatus(status) {
+        return !COMPLETED_SET.has(status) && !BAD_SET.has(status);
     }
 
     // รวม element ที่เป็น booking เดียวกัน (desktop+mobile) เข้าเป็นกลุ่มเดียว
@@ -63,28 +45,27 @@
 
     function updateStats() {
         const groups = groupByBookingId();
-        let all = 0, pending = 0, approved = 0, bad = 0;
+        let all = 0, pending = 0, completed = 0, bad = 0;
 
         groups.forEach(els => {
-            // หยิบ status จากตัวแรกพอ (ค่าทุกตัวควรเหมือนกัน)
             const st = (els[0].getAttribute("data-status") || "").trim();
             all++;
 
-            if (PENDING_SET.has(st)) pending++;
-            else if (APPROVED_SET.has(st)) approved++;
+            if (COMPLETED_SET.has(st)) completed++;
             else if (BAD_SET.has(st)) bad++;
+            else if (isPendingStatus(st)) pending++;
         });
 
         if (countAll) countAll.textContent = String(all);
         if (countPending) countPending.textContent = String(pending);
-        if (countApproved) countApproved.textContent = String(approved);
+        if (countCompleted) countCompleted.textContent = String(completed);
         if (countBad) countBad.textContent = String(bad);
     }
 
     function updateList() {
         const q = norm(hisSearch?.value);
         const st = (hisStatus?.value || "all").trim();
-        const rg = (hisRange?.value || "30").trim();
+        const vehicle = (hisVehicle?.value || "all").trim();
 
         const groups = groupByBookingId();
         let visibleBookings = 0;
@@ -92,13 +73,12 @@
         groups.forEach(els => {
             const status = (els[0].getAttribute("data-status") || "").trim();
             const text = norm(els[0].getAttribute("data-text"));
-            const dateStr = (els[0].getAttribute("data-date") || "").trim();
-            const date = parseDateYYYYMMDD(dateStr);
+            const vehicleType = (els[0].getAttribute("data-vehicle") || "").trim();
 
             const passText = !q || text.includes(q);
             const passStatus = (st === "all") || (status === st);
-            const passRange = withinRange(date, rg);
-            const show = passText && passStatus && passRange;
+            const passVehicle = (vehicle === "all") || (vehicleType === vehicle);
+            const show = passText && passStatus && passVehicle;
 
             els.forEach(el => (el.style.display = show ? "" : "none"));
             if (show) visibleBookings++;
@@ -108,7 +88,7 @@
         if (emptyCards) emptyCards.style.display = (visibleBookings === 0) ? "" : "none";
     }
 
-    [hisSearch, hisRange, hisStatus].forEach(el => {
+    [hisSearch, hisVehicle, hisStatus].forEach(el => {
         if (!el) return;
         el.addEventListener("input", updateList);
         el.addEventListener("change", updateList);
@@ -117,7 +97,7 @@
     if (hisClear) {
         hisClear.addEventListener("click", () => {
             if (hisSearch) hisSearch.value = "";
-            if (hisRange) hisRange.value = "30";
+            if (hisVehicle) hisVehicle.value = "all";
             if (hisStatus) hisStatus.value = "all";
             updateList();
         });

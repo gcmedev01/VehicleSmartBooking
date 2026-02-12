@@ -1,5 +1,4 @@
-﻿
-@{
+﻿@{
     Layout = "_VehicleBookingLayout";
     ViewData["Title"] = "Vehicle Booking";
 }
@@ -12,14 +11,13 @@
             <div>
                 <h1 class="vb-page-h1">Vehicle Service Request</h1>
                 <div class="vb-page-sub">
-                    Online vehicle smart booking
+                    สร้างคำร้องขอใช้รถ
                 </div>
             </div>
         </div>
 
         <div class="vb-page-meta d-none d-md-flex">
-            <span class="vb-meta-pill">Smart Booking</span>
-            <span class="vb-meta-pill">Auto Dispatch</span>
+            <span class="vb-meta-pill">Booking</span>
         </div>
     </div>
 
@@ -29,13 +27,13 @@
             <div class="fw-semibold">ประเภทการจอง</div>
             <div class="vb-toggle">
                 <button type="button" class="vb-toggle-btn is-active" data-vb-booking="in">
-                    จองในจังหวัด
+                    ในจังหวัด
                 </button>
                 <button type="button" class="vb-toggle-btn" data-vb-booking="out">
-                    จองนอกจังหวัด
+                    ต่างจังหวัด
                 </button>
                 <button type="button" class="vb-toggle-btn" data-vb-booking="personal">
-                    ใช้รถส่วนตัว
+                    รถส่วนตัว
                 </button>
             </div>
         </div>
@@ -141,6 +139,8 @@
                 </div>
             </div>
 
+            <div id="vbAvailability" class="alert d-none" role="status"></div>
+
             <div class="row g-3">
                 <div class="col-12 col-md-4">
                     <label class="form-label">Job No / Cost Center / SO No</label>
@@ -222,88 +222,30 @@
                 <div class="vb-approval mt-3">
                     <div class="fw-semibold mb-3">ขั้นตอนการอนุมัติ</div>
 
-                    <div class="vb-steps">
-                        <!-- DM -->
-                        <div class="vb-step">
-                            <div class="vb-step-badge">1</div>
-                            <div class="vb-step-body">
-                                <div class="vb-step-title">DM</div>
-
-                                <div class="vb-approver-card">
-                                    <div class="vb-approver-row">
-                                        <span class="vb-approver-label">รหัสพนักงาน</span>
-                                        <span class="vb-approver-value">26009695</span>
-                                    </div>
-                                    <div class="vb-approver-row">
-                                        <span class="vb-approver-label">ชื่อ-นามสกุล</span>
-                                        <span class="vb-approver-value">Thanadon Prutthisan</span>
-                                    </div>
-                                    <div class="vb-approver-row">
-                                        <span class="vb-approver-label">ตำแหน่ง</span>
-                                        <span class="vb-approver-value">Department Manager</span>
-                                    </div>
-                                    <div class="vb-approver-row">
-                                        <span class="vb-approver-label">หน่วยงาน</span>
-                                        <span class="vb-approver-value">C-OR-DT</span>
+                    @if (ViewBag.ApprovalPreview is IEnumerable<dynamic> preview && preview.Any())
+                    {
+                        <div class="vb-steps">
+                            @foreach (var step in preview)
+                            {
+                                <div class="vb-step">
+                                    <div class="vb-step-badge">@step.LevelNo</div>
+                                    <div class="vb-step-body">
+                                        <div class="vb-step-title">@step.Position</div>
+                                        <div class="vb-approver-card">
+                                            <div class="vb-approver-row">
+                                                <span class="vb-approver-label">ชื่อ-นามสกุล</span>
+                                                <span class="vb-approver-value">@step.Name</span>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
+                            }
                         </div>
-
-                        <!-- VP -->
-                        <div class="vb-step">
-                            <div class="vb-step-badge">2</div>
-                            <div class="vb-step-body">
-                                <div class="vb-step-title">VP</div>
-
-                                <div class="vb-approver-card">
-                                    <div class="vb-approver-row">
-                                        <span class="vb-approver-label">รหัสพนักงาน</span>
-                                        <span class="vb-approver-value">26007069</span>
-                                    </div>
-                                    <div class="vb-approver-row">
-                                        <span class="vb-approver-label">ชื่อ-นามสกุล</span>
-                                        <span class="vb-approver-value">Pookrit Chanasinpoondet</span>
-                                    </div>
-                                    <div class="vb-approver-row">
-                                        <span class="vb-approver-label">ตำแหน่ง</span>
-                                        <span class="vb-approver-value">Vice President</span>
-                                    </div>
-                                    <div class="vb-approver-row">
-                                        <span class="vb-approver-label">หน่วยงาน</span>
-                                        <span class="vb-approver-value">C-OR</span>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- DMD -->
-                        <div class="vb-step">
-                            <div class="vb-step-badge">3</div>
-                            <div class="vb-step-body">
-                                <div class="vb-step-title">DMD</div>
-
-                                <div class="vb-approver-card">
-                                    <div class="vb-approver-row">
-                                        <span class="vb-approver-label">รหัสพนักงาน</span>
-                                        <span class="vb-approver-value">26010243</span>
-                                    </div>
-                                    <div class="vb-approver-row">
-                                        <span class="vb-approver-label">ชื่อ-นามสกุล</span>
-                                        <span class="vb-approver-value">Wiwalya Mangkalakun</span>
-                                    </div>
-                                    <div class="vb-approver-row">
-                                        <span class="vb-approver-label">ตำแหน่ง</span>
-                                        <span class="vb-approver-value">Deputy Managing Director</span>
-                                    </div>
-                                    <div class="vb-approver-row">
-                                        <span class="vb-approver-label">หน่วยงาน</span>
-                                        <span class="vb-approver-value">DCE</span>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
+                    }
+                    else
+                    {
+                        <div class="text-muted small">@((ViewBag.ApprovalPreviewNote as string) ?? "ไม่พบข้อมูลสายอนุมัติ")</div>
+                    }
                 </div>
 
             </div>
@@ -321,7 +263,7 @@
         <!-- Actions -->
         <div class="d-flex flex-column flex-md-row gap-2 justify-content-end">
             <button type="button" class="btn btn-light" id="btnReset">ล้างข้อมูล</button>
-            <button type="submit" class="btn btn-primary" id="btnSubmit">
+            <button type="submit" class="btn btn-ci" id="btnSubmit">
                 ส่งคำขอจอง
             </button>
         </div>

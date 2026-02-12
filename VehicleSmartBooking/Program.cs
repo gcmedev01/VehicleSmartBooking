@@ -14,6 +14,16 @@ builder.Services.AddDbContext<VehicleBookingDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection"));
 });
 
+// Add session support
+builder.Services.AddDistributedMemoryCache();
+builder.Services.AddSession(options =>
+{
+    options.IdleTimeout = TimeSpan.FromHours(8);
+    options.Cookie.HttpOnly = true;
+    options.Cookie.IsEssential = true;
+    options.Cookie.SameSite = SameSiteMode.Lax;
+});
+
 builder.Services
     .AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
     .AddCookie(options =>
@@ -37,6 +47,11 @@ builder.Services.Configure<SsoOptions>(
 // removed ISsoClient registration
 builder.Services.AddAuthorization();
 builder.Services.AddScoped<IPasswordHasher, Pbkdf2PasswordHasher>();
+builder.Services.AddScoped<ICurrentUserService, CurrentUserService>();
+builder.Services.AddScoped<IDriverWorkflowService, DriverWorkflowService>();
+
+// IHttpContextAccessor needed for CurrentUserService to read session
+builder.Services.AddHttpContextAccessor();
 
 var app = builder.Build();
 
@@ -58,6 +73,9 @@ if (!app.Environment.IsDevelopment())
 app.UseHttpsRedirection();
 app.UseStaticFiles();
 app.UseRouting();
+
+// Enable session before authentication so controllers/middleware can access session data
+app.UseSession();
 
 app.UseAuthentication();
 app.UseAuthorization();

@@ -15,6 +15,7 @@ public sealed class Booking
 
     public string PickupLocation { get; set; } = null!;
     public string DestinationLocation { get; set; } = null!;
+    public string? RequesterPhone { get; set; }
     public string? Purpose { get; set; }
     public int? PassengerCount { get; set; }
     public string? DetailNote { get; set; }

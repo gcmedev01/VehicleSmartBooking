@@ -1,0 +1,75 @@
+@model IList<VehicleBooking.Web.Domain.Entities.Driver>
+@using VehicleBooking.Web.Domain.Enums
+@using System.Globalization
+
+@{
+    Layout = "_VehicleBookingLayout";
+    ViewData["Title"] = "Drivers";
+    ViewData["ActiveNav"] = "AdminDrivers";
+
+    string VehicleText(VehicleType v) => v switch
+    {
+        VehicleType.Pickup => "Ã¶¡ÃÐºÐ",
+        VehicleType.Van => "Ã¶µÙé",
+        VehicleType.Sedan => "Ã¶à¡ë§",
+        _ => v.ToString()
+    };
+}
+
+<div class="vb-page-head vb-page-hero mb-4">
+    <div class="vb-page-title">
+        <div class="vb-page-icon">??</div>
+        <div>
+            <h1 class="vb-page-h1">Drivers</h1>
+            <div class="vb-page-sub">Manage drivers</div>
+        </div>
+    </div>
+</div>
+
+<div class="d-flex justify-content-end mb-3">
+    <a asp-action="CreateDriver" class="btn btn-ci">Create Driver</a>
+</div>
+
+<div class="vb-card p-3">
+    @if (Model == null || !Model.Any())
+    {
+        <div class="text-muted">No drivers</div>
+    }
+    else
+    {
+        <div class="table-responsive">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Code</th>
+                        <th>Name</th>
+                        <th>Vehicle</th>
+                        <th>Type</th>
+                        <th class="text-center">Active</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach(var d in Model)
+                    {
+                        var vehicleTypeText = d.Vehicle == null ? "" : VehicleText(d.Vehicle.VehicleType);
+                        var dotColor = d.IsActive ? "#28a745" : "#adb5bd";
+                        <tr>
+                            <td>@d.User.UserCode</td>
+                            <td>@(d.User.UsernameTH ?? d.User.UsernameEN ?? "-")</td>
+                            <td>@(d.Vehicle?.PlateNo ?? "-")</td>
+                            <td>@vehicleTypeText</td>
+                            <td class="text-center">
+                                <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:@dotColor;"></span>
+                            </td>
+                            <td class="text-end">
+                                <a asp-action="EditDriver" asp-route-id="@d.DriverId" class="btn btn-sm btn-outline-secondary">Edit</a>
+                                <form asp-action="DeleteDriver" asp-route-id="@d.DriverId" method="post" class="d-inline">@Html.AntiForgeryToken()<button class="btn btn-sm btn-danger">Deactivate</button></form>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>

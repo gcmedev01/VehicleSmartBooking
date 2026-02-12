@@ -5,6 +5,7 @@ using VehicleBooking.Web.Data;
 using VehicleBooking.Web.Domain.Auth;
 using Microsoft.Extensions.Options;
 using VehicleBooking.Web.Domain.Options;
+using System.Text.Json;
 
 namespace VehicleSmartBooking.Controllers
 {
@@ -69,22 +70,51 @@ namespace VehicleSmartBooking.Controllers
             }
 
             var principal = ClaimsFactory.Create(user);
+
+            // Sign in using cookie authentication to keep ASP.NET authorization working.
             await HttpContext.SignInAsync(principal);
+
+            // Also persist selected claim information in server-side session (JSON) and avoid storing everything in cookie.
+            try
+            {
+                HttpContext.Session.Clear();
+                var sessionObj = new Dictionary<string, object?>
+                {
+                    ["UserCode"] = user.UserCode,
+                    ["UserId"] = user.UserId,
+                    ["UsernameEN"] = user.UsernameEN,
+                    ["UsernameTH"] = user.UsernameTH,
+                    ["DisplayName"] = !string.IsNullOrWhiteSpace(user.UsernameTH) ? user.UsernameTH : (user.UsernameEN ?? user.UserCode),
+                    ["RoleFlags"] = user.RoleFlags
+                };
+
+                var json = JsonSerializer.Serialize(sessionObj);
+                HttpContext.Session.SetString("CurrentUser", json);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to write user info into session for UserCode={UserCode}", user.UserCode);
+            }
 
             return RedirectAfterLogin(user);
         }
 
-        private IActionResult RedirectAfterLogin(dynamic user)
+        private IActionResult RedirectAfterLogin(VehicleBooking.Web.Domain.Entities.User user)
         {
-            int roleFlags = (int)user.RoleFlags;
+            int roleFlags = user.RoleFlags;
 
-            bool isAdmin = (roleFlags & 2) == 2;
             bool isDriver = (roleFlags & 4) == 4;
-            bool isApprover = (roleFlags & 8) == 8;
 
-            if (isAdmin) return RedirectToAction("Fleet", "Admin");
-            if (isDriver) return RedirectToAction("Dashboard", "Driver");
-            if (isApprover) return RedirectToAction("Index", "Approvals");
+            if (isDriver)
+            {
+                var hasDriverProfile = _db.Drivers.AsNoTracking().Any(d => d.UserId == user.UserId && d.IsActive);
+                if (hasDriverProfile)
+                {
+                    return RedirectToAction("MyJobs", "Driver");
+                }
+
+                return RedirectToAction("NotPermission", "Home");
+            }
 
             return RedirectToAction("Create", "Booking");
         }
@@ -93,6 +123,17 @@ namespace VehicleSmartBooking.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Logout()
         {
+            // Clear server-side session data
+            try
+            {
+                HttpContext.Session.Clear();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to clear session during logout.");
+            }
+
+            // Sign out authentication cookie
             await HttpContext.SignOutAsync();
             return RedirectToAction("Index", "Home");
         }

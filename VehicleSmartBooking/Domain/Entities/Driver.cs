@@ -6,6 +6,8 @@ public sealed class Driver
     public int UserId { get; set; }
     public int VehicleId { get; set; }
 
+    public string? Phone { get; set; }
+
     public bool IsActive { get; set; } = true;
     public DateTime? LastAssignedAtUtc { get; set; }
 

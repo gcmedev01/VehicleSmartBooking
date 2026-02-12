@@ -1,0 +1,231 @@
+@model VehicleBooking.Web.Domain.Entities.Booking
+@using VehicleBooking.Web.Domain.Enums
+@using System.Globalization
+
+@{
+    Layout = "_VehicleBookingLayout";
+    ViewData["Title"] = "Booking Detail (Admin)";
+
+    if (Model == null)
+    {
+        return;
+    }
+
+    string TripText(TripType t) => t switch
+    {
+        TripType.InProvince => "ในจังหวัด",
+        TripType.OutProvince => "นอกจังหวัด",
+        _ => t.ToString()
+    };
+
+    string VehicleText(VehicleType v) => v switch
+    {
+        VehicleType.Pickup => "รถกระบะ",
+        VehicleType.Van => "รถตู้",
+        VehicleType.Sedan => "รถเก๋ง",
+        _ => v.ToString()
+    };
+
+    string StatusText(BookingStatus st) => st switch
+    {
+        BookingStatus.Draft => "ร่าง",
+        BookingStatus.Submitted => "ส่งคำขอแล้ว",
+        BookingStatus.WaitingApproval => "รออนุมัติ",
+        BookingStatus.WaitingDriverAccept => "รอพนักงานขับรถตอบรับ",
+        BookingStatus.DriverAccepted => "พนักงานขับรถตอบรับ",
+        BookingStatus.WaitingAdminVendorQuotation => "รอเสนอราคาผู้ให้บริการ",
+        BookingStatus.WaitingUserVendorAccept => "รอผู้ขอใช้ยอมรับผู้ให้บริการ",
+        BookingStatus.WaitingAdminVendorConfirm => "รอยืนยันผู้ให้บริการ",
+        BookingStatus.VendorRejectedByUser => "ผู้ขอใช้ปฏิเสธผู้ให้บริการ",
+        BookingStatus.Completed => "เสร็จสิ้น",
+        BookingStatus.Rated => "ให้คะแนนแล้ว",
+        BookingStatus.Rejected => "ถูกปฏิเสธ",
+        BookingStatus.Cancelled => "ยกเลิก",
+        BookingStatus.AdminActionRequired => "รอผู้ดูแลดำเนินการ",
+        _ => st.ToString()
+    };
+
+    string ApprovalStatusText(ApprovalStatus st) => st switch
+    {
+        ApprovalStatus.Pending => "รอดำเนินการ",
+        ApprovalStatus.Approved => "อนุมัติ",
+        ApprovalStatus.Rejected => "ไม่อนุมัติ",
+        _ => st.ToString()
+    };
+
+    string ApprovalBadgeClass(ApprovalStatus st) => st switch
+    {
+        ApprovalStatus.Pending => "bg-warning text-dark",
+        ApprovalStatus.Approved => "bg-success",
+        ApprovalStatus.Rejected => "bg-danger",
+        _ => "bg-secondary"
+    };
+
+    // ===== Derived values (กัน Razor เพี้ยน) =====
+    var requesterName =
+        !string.IsNullOrWhiteSpace(Model.Requester?.UsernameTH)
+            ? Model.Requester.UsernameTH
+            : !string.IsNullOrWhiteSpace(Model.Requester?.UsernameEN)
+                ? Model.Requester.UsernameEN
+                : Model.RequesterUserId.ToString();
+
+    var requesterCode = Model.Requester?.UserCode ?? "-";
+    var requesterPhone = string.IsNullOrWhiteSpace(Model.RequesterPhone) ? "-" : Model.RequesterPhone;
+    var passengers = Model.PassengerCount ?? 1;
+    var jobNo = string.IsNullOrWhiteSpace(Model.JobNo) ? "-" : Model.JobNo;
+    var costCenter = string.IsNullOrWhiteSpace(Model.CostCenter) ? "-" : Model.CostCenter;
+    var soNo = string.IsNullOrWhiteSpace(Model.SONo) ? "-" : Model.SONo;
+
+    // External rental info
+    var external = Model.ExternalRental;
+
+    // show assigned vehicle plate / driver name when available
+    var vehicleText = Model.AssignedVehicle != null ? Model.AssignedVehicle.PlateNo : (Model.AssignedVehicleId.HasValue ? $"#{Model.AssignedVehicleId}" : "-");
+    var driverText = Model.AssignedDriver != null ? (Model.AssignedDriver.User?.UsernameTH ?? Model.AssignedDriver.User?.UsernameEN ?? $"#{Model.AssignedDriver.DriverId}") : (Model.AssignedDriverId.HasValue ? $"#{Model.AssignedDriverId}" : "-");
+    var driverPhone = !string.IsNullOrWhiteSpace(Model.AssignedDriver?.Phone) ? Model.AssignedDriver.Phone : "-";
+
+    var isExternal = Model.IsExternalRental ? "ผู้ให้บริการภายนอก" : "รถบริษัท";
+    var tripTypeText = TripText(Model.TripType);
+    var vehicleTypeText = VehicleText(Model.VehicleTypeRequested);
+    var statusText = StatusText(Model.Status);
+
+    var createdLocal = Model.CreatedAtUtc.ToLocalTime();
+}
+
+<div class="vb-page-head vb-page-hero mb-4">
+    <div class="vb-page-title">
+        <div class="vb-page-icon">??</div>
+        <div>
+            <h1 class="vb-page-h1">Booking #@Model.BookingId</h1>
+            <div class="vb-page-sub">Admin actions</div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-3">
+    <div class="col-12 col-md-6">
+        <div class="vb-card p-3">
+            <div class="fw-semibold mb-2">Basic</div>
+            <div>Requester: @(Model.Requester?.UsernameTH ?? Model.Requester?.UsernameEN ?? Model.RequesterUserId.ToString())</div>
+            <div>Start: @Model.StartAtUtc.ToLocalTime().ToString("g")</div>
+            <div>Status: @Model.Status</div>
+        </div>
+
+        @* Vendor quote section *@
+        <div class="vb-card p-3 mt-3">
+            <div class="fw-semibold mb-2">Vendor Quote</div>
+
+            @if (Model.ExternalRental == null)
+            {
+                <div class="text-muted">No vendor quote yet.</div>
+            }
+            else
+            {
+                <div><strong>Vendor:</strong> @Model.ExternalRental.VendorName</div>
+                <div><strong>Price:</strong> @(Model.ExternalRental.QuotedPrice?.ToString("C") ?? "-")</div>
+                <div><strong>Sent:</strong> @(Model.ExternalRental.QuoteSentAtUtc?.ToLocalTime().ToString("g") ?? "-")</div>
+                <div><strong>User decision:</strong> @Model.ExternalRental.UserDecision</div>
+                @if (!string.IsNullOrWhiteSpace(Model.ExternalRental.Note))
+                {
+                    <div><strong>Note:</strong> @Model.ExternalRental.Note</div>
+                }
+            }
+
+            @* Show send/resend quote form when booking awaiting admin quotation or admin wants to resend while user hasn't decided *@
+            @if (Model.Status == VehicleBooking.Web.Domain.Enums.BookingStatus.WaitingAdminVendorQuotation || Model.Status == VehicleBooking.Web.Domain.Enums.BookingStatus.WaitingUserVendorAccept)
+            {
+                <hr />
+                <form asp-action="SendVendorQuote" asp-route-id="@Model.BookingId" method="post">
+                    @Html.AntiForgeryToken()
+                    <div class="mb-2">
+                        <label class="form-label">Vendor name</label>
+                        <input name="VendorName" class="form-control" value="@(Model.ExternalRental?.VendorName ?? "")" />
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label">Quoted price</label>
+                        <input name="QuotedPrice" type="number" step="0.01" class="form-control" value="@(Model.ExternalRental?.QuotedPrice?.ToString() ?? "")" />
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label">Note</label>
+                        <textarea name="Note" class="form-control">@(Model.ExternalRental?.Note ?? "")</textarea>
+                    </div>
+                    <div class="d-flex gap-2 justify-content-end">
+                        <a asp-action="Worklist" class="btn btn-light">Back</a>
+                        <button class="btn btn-primary" type="submit">Send / Update Quote</button>
+                    </div>
+                </form>
+            }
+        </div>
+
+        @* Confirm rental details (after approvals complete) *@
+        @if (Model.Status == VehicleBooking.Web.Domain.Enums.BookingStatus.WaitingAdminVendorConfirm)
+        {
+            <div class="vb-card p-3 mt-3">
+                <div class="fw-semibold mb-2">Confirm Rental Details</div>
+                <form asp-action="ConfirmVendor" asp-route-id="@Model.BookingId" method="post">
+                    @Html.AntiForgeryToken()
+                    <div class="mb-2">
+                        <label class="form-label">ทะเบียนรถ</label>
+                        <input name="RentalPlateNo" class="form-control" value="@(Model.ExternalRental?.RentalPlateNo ?? "")" />
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label">รายชื่อพนักงานขับรถ</label>
+                        <input name="RentalDriverName" class="form-control" value="@(Model.ExternalRental?.RentalDriverName ?? "")" />
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label">เบอร์โทรพนักงานขับรถ</label>
+                        <input name="RentalDriverPhone" class="form-control" value="@(Model.ExternalRental?.RentalDriverPhone ?? "")" />
+                    </div>
+                    <div class="d-flex gap-2 justify-content-end">
+                        <button class="btn btn-success" type="submit">Confirm</button>
+                    </div>
+                </form>
+            </div>
+        }
+
+        <div class="vb-card p-3 mt-3">
+            <div class="fw-semibold mb-2">Admin Controls</div>
+            <form asp-action="ForceComplete" asp-route-id="@Model.BookingId" method="post" class="mb-2">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="comment" value="Admin force complete" />
+                <button class="btn btn-outline-danger">Force Complete</button>
+            </form>
+        </div>
+    </div>
+
+    <div class="col-12 col-md-6">
+        <div class="vb-card p-3">
+            <div class="fw-semibold mb-2">Attachments</div>
+            @if (Model.Attachments?.Any() == true)
+            {
+                <ul class="list-unstyled mb-0">
+                    @foreach (var a in Model.Attachments)
+                    {
+                        <li class="mb-1"><a href="@a.StoragePath" target="_blank">@a.FileName</a></li>
+                    }
+                </ul>
+            }
+            else
+            {
+                <div class="text-muted">No attachments</div>
+            }
+        </div>
+
+        <div class="vb-card p-3 mt-3">
+            <div class="fw-semibold mb-2">Approvals</div>
+            @if (Model.Approvals?.Any() == true)
+            {
+                <ul class="list-unstyled">
+                    @foreach (var a in Model.Approvals.OrderBy(x => x.LevelNo))
+                    {
+                        <li>@a.LevelNo - @a.ApproverUserId - @a.Status (@(a.ActionAtUtc?.ToLocalTime().ToString("g") ?? "-"))</li>
+                    }
+                </ul>
+            }
+            else
+            {
+                <div class="text-muted">No approval rows</div>
+            }
+        </div>
+    </div>
+</div>

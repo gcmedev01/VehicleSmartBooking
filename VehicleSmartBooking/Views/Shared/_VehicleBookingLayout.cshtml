@@ -13,16 +13,28 @@
         // Booking
         if (controller == "booking" && action == "create") active = "MyRequest";
         else if (controller == "booking" && (action == "mybookings" || action == "detail")) active = "MyTask";
-        else if (controller == "booking" && action == "queue") active = "Queue";
 
         // Approvals
-        else if (controller == "approvals") active = "Approvals";
+        else if (controller == "approvals" && action == "pending") active = "Approve";
+        else if (controller == "approvals" && action == "history") active = "ApproveHistory";
+        else if (controller == "approvals" && action == "detail") active = "Approve";
 
         // Admin
-        else if (controller == "admin") active = "Admin";
+        else if (controller == "admin" && action == "worklist") active = "AdminWorklist";
+        else if (controller == "admin" && (action == "allbookings" || action == "detail")) active = "AllTasks";
+        else if (controller == "admin" && action == "booking") active = "AdminWorklist";
+        else if (controller == "admin" && action == "queue") active = "Queue";
+        else if (controller == "admin" && action == "vehicles") active = "AdminVehicles";
+        else if (controller == "admin" && action == "vehiclecreate") active = "AdminVehicles";
+        else if (controller == "admin" && action == "vehicleedit") active = "AdminVehicles";
+        else if (controller == "admin" && action == "drivers") active = "AdminDrivers";
+        else if (controller == "admin" && action == "editdriver") active = "AdminDrivers";
+        else if (controller == "admin" && action == "createdriver") active = "AdminDrivers";
+        else if (controller == "admin" && action == "users") active = "AdminUsers";
+        else if (controller == "admin" && action == "createapprover") active = "AdminUsers";
 
         // Driver
-        else if (controller == "driver") active = "Driver";
+        else if (controller == "driver" && (action == "myjobs" || action == "detail")) active = "DriverJobs";
 
         else active = "MyTask";
     }
@@ -39,7 +51,6 @@
     // - Driver "cannot book" / "cannot view queue" if driver-only.
     // - If user has other roles too (User/Approver/Admin) => allow booking pages.
     var canBook = isUser || isApprover || isAdmin;
-    var canSeeQueue = canBook; // same rule
     var canSeeApprovals = isApprover || isAdmin; // admin can help approve if you want
     var canSeeAdmin = isAdmin;
 
@@ -133,111 +144,119 @@
     <div class="vb-shell">
         <!-- Sidebar -->
         <aside class="vb-sidebar offcanvas offcanvas-md offcanvas-start" tabindex="-1" id="vbSidebar" aria-labelledby="vbSidebarLabel">
-            <div class="offcanvas-header d-md-none">
-                <h5 class="offcanvas-title" id="vbSidebarLabel">เมนู</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
-            </div>
-
-            <div class="vb-sidebar-inner">
-                <div class="vb-sidebar-header">
+             <div class="vb-sidebar-inner">
+                 <div class="vb-sidebar-header">
                     <div class="vb-brand d-flex align-items-center gap-2">
                         <div class="vb-logo">VB</div>
                         <div>
                             <div class="fw-semibold">Vehicle Booking</div>
-                            <div class="text-muted small">Role-based Navigation</div>
+                            <div class="text-muted small">ระบบจองรถ</div>
                         </div>
                     </div>
-                </div>
+                    <button type="button" class="btn-close d-md-none" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+                 </div>
 
                 <nav class="vb-nav">
                     @* ========= Requester pages (User/Approver/Admin) ========= *@
                     @if (canBook)
                     {
-                        <div class="text-muted small px-2 mt-1 mb-2" style="opacity:.85;">REQUEST</div>
+                        <div class="vb-nav-section">
+                            <div class="vb-nav-label">REQUEST</div>
 
-                        <a asp-controller="Booking" asp-action="Create"
-                           class="vb-nav-item @(active == "MyRequest" ? "is-active" : "")"
-                           aria-current="@(active == "MyRequest" ? "page" : "")">
-                            <span class="vb-nav-dot"></span>
-                            My Request
-                        </a>
-
-                        <a asp-controller="Booking" asp-action="MyBookings"
-                           class="vb-nav-item @(active == "MyTask" ? "is-active" : "")"
-                           aria-current="@(active == "MyTask" ? "page" : "")">
-                            <span class="vb-nav-dot"></span>
-                            My Task
-                        </a>
-
-                        @if (canSeeQueue)
-                        {
-                            <a asp-controller="Booking" asp-action="Queue"
-                               class="vb-nav-item @(active == "Queue" ? "is-active" : "")"
-                               aria-current="@(active == "Queue" ? "page" : "")">
-                                <span class="vb-nav-dot"></span>
-                                ดูคิวรถ
+                            <a asp-controller="Booking" asp-action="Create"
+                               class="vb-nav-item @(active == "MyRequest" ? "is-active" : "")"
+                               aria-current="@(active == "MyRequest" ? "page" : "")">
+                                <span class="vb-nav-icon"><i class="bi bi-plus-circle"></i></span>
+                                My Request
                             </a>
-                        }
+
+                            <a asp-controller="Booking" asp-action="MyBookings"
+                               class="vb-nav-item @(active == "MyTask" ? "is-active" : "")"
+                               aria-current="@(active == "MyTask" ? "page" : "")">
+                                <span class="vb-nav-icon"><i class="bi bi-briefcase"></i></span>
+                                My Task
+                            </a>
+                        </div>
                     }
 
                     @* ========= Approver ========= *@
                     @if (canSeeApprovals)
                     {
-                        <div class="text-muted small px-2 mt-3 mb-2" style="opacity:.85;">APPROVAL</div>
+                        <div class="vb-nav-section">
+                            <div class="vb-nav-label">APPROVAL</div>
 
-                        <a asp-controller="Approvals" asp-action="Pending"
-                           class="vb-nav-item @(active == "Approvals" ? "is-active" : "")"
-                           aria-current="@(active == "Approvals" ? "page" : "")">
-                            <span class="vb-nav-dot"></span>
-                            Pending Approvals
-                        </a>
+                            <a asp-controller="Approvals" asp-action="Pending"
+                               class="vb-nav-item @(active == "Approve" ? "is-active" : "")"
+                               aria-current="@(active == "Approve" ? "page" : "")">
+                                <span class="vb-nav-icon"><i class="bi bi-check2-square"></i></span>
+                                Pending Approvals
+                            </a>
 
-                        <a asp-controller="Approvals" asp-action="History"
-                           class="vb-nav-item">
-                            <span class="vb-nav-dot"></span>
-                            Approval History
-                        </a>
+                            <a asp-controller="Approvals" asp-action="History"
+                               class="vb-nav-item @(active == "ApproveHistory" ? "is-active" : "")">
+                                <span class="vb-nav-icon"><i class="bi bi-clock-history"></i></span>
+                                Approval History
+                            </a>
+                        </div>
                     }
 
                     @* ========= Admin ========= *@
                     @if (canSeeAdmin)
                     {
-                        <div class="text-muted small px-2 mt-3 mb-2" style="opacity:.85;">ADMIN</div>
+                        <div class="vb-nav-section">
+                            <div class="vb-nav-label">ADMIN</div>
 
-                        <a asp-controller="Admin" asp-action="Worklist"
-                           class="vb-nav-item @(active == "Admin" ? "is-active" : "")"
-                           aria-current="@(active == "Admin" ? "page" : "")">
-                            <span class="vb-nav-dot"></span>
-                            Admin Worklist
-                        </a>
+                            <a asp-controller="Admin" asp-action="Worklist"
+                               class="vb-nav-item @(active == "AdminWorklist" ? "is-active" : "")"
+                               aria-current="@(active == "AdminWorklist" ? "page" : "")">
+                                <span class="vb-nav-icon"><i class="bi bi-list-check"></i></span>
+                                Admin Worklist
+                            </a>
 
-                        <a asp-controller="Admin" asp-action="Vehicles" class="vb-nav-item">
-                            <span class="vb-nav-dot"></span>
-                            Vehicles
-                        </a>
+                            <a asp-controller="Admin" asp-action="AllBookings"
+                               class="vb-nav-item @(active == "AllTasks" ? "is-active" : "")"
+                               aria-current="@(active == "AllTasks" ? "page" : "")">
+                                <span class="vb-nav-icon"><i class="bi bi-briefcase"></i></span>
+                                All Tasks
+                            </a>
 
-                        <a asp-controller="Admin" asp-action="Drivers" class="vb-nav-item">
-                            <span class="vb-nav-dot"></span>
-                            Drivers
-                        </a>
+                            <a asp-controller="Admin" asp-action="Queue"
+                               class="vb-nav-item @(active == "Queue" ? "is-active" : "")"
+                               aria-current="@(active == "Queue" ? "page" : "")">
+                                <span class="vb-nav-icon"><i class="bi bi-calendar3"></i></span>
+                                Queue
+                            </a>
 
-                        <a asp-controller="Admin" asp-action="Users" class="vb-nav-item">
-                            <span class="vb-nav-dot"></span>
-                            Users & Roles
-                        </a>
+                            <a asp-controller="Admin" asp-action="Vehicles" class="vb-nav-item @(active == "AdminVehicles" ? "is-active" : "")">
+                                <span class="vb-nav-icon"><i class="bi bi-truck"></i></span>
+                                Vehicles
+                            </a>
+
+                            <a asp-controller="Admin" asp-action="Drivers" class="vb-nav-item @(active == "AdminDrivers" ? "is-active" : "")">
+                                <span class="vb-nav-icon"><i class="bi bi-person-badge"></i></span>
+                                Drivers
+                            </a>
+
+                            <a asp-controller="Admin" asp-action="Users" class="vb-nav-item @(active == "AdminUsers" ? "is-active" : "")">
+                                <span class="vb-nav-icon"><i class="bi bi-people"></i></span>
+                                Users & Roles
+                            </a>
+                        </div>
                     }
 
                     @* ========= Driver ========= *@
                     @if (isDriver)
                     {
-                        <div class="text-muted small px-2 mt-3 mb-2" style="opacity:.85;">DRIVER</div>
+                        <div class="vb-nav-section">
+                            <div class="vb-nav-label">DRIVER</div>
 
-                        <a asp-controller="Driver" asp-action="MyJobs"
-                           class="vb-nav-item @(active == "Driver" ? "is-active" : "")"
-                           aria-current="@(active == "Driver" ? "page" : "")">
-                            <span class="vb-nav-dot"></span>
-                            My Jobs
-                        </a>
+                            <a asp-controller="Driver" asp-action="MyJobs"
+                               class="vb-nav-item @(active == "DriverJobs" ? "is-active" : "")"
+                               aria-current="@(active == "DriverJobs" ? "page" : "")">
+                                <span class="vb-nav-icon"><i class="bi bi-steering-wheel"></i></span>
+                                My Jobs
+                            </a>
+                        </div>
                     }
                 </nav>
 

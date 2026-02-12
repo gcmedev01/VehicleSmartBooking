@@ -1,0 +1,157 @@
+﻿@using VehicleBooking.Web.Domain.Enums
+@model IList<VehicleBooking.Web.Domain.Entities.Booking>
+
+@{
+    Layout = "_VehicleBookingLayout";
+    ViewData["Title"] = "My Jobs";
+    ViewData["ActiveNav"] = "DriverJobs";
+
+    string StatusClass(BookingStatus st) => st switch
+    {
+        BookingStatus.WaitingDriverAccept => "vb-status-pending",
+        BookingStatus.DriverAccepted => "vb-status-approved",
+        BookingStatus.Completed => "vb-status-completed",
+        BookingStatus.Rated => "vb-status-completed",
+        BookingStatus.Rejected => "vb-status-rejected",
+        BookingStatus.Cancelled => "vb-status-rejected",
+        BookingStatus.VendorRejectedByUser => "vb-status-rejected",
+        _ => "vb-status-pending"
+    };
+
+    string StatusText(BookingStatus st) => st switch
+    {
+        BookingStatus.WaitingDriverAccept => "รอคนขับกดยืนยัน",
+        BookingStatus.DriverAccepted => "คนขับรับงานแล้ว",
+        BookingStatus.Completed => "จบงานแล้ว",
+        BookingStatus.Rated => "จบงานแล้ว",
+        BookingStatus.Rejected => "ถูกปฏิเสธ",
+        BookingStatus.Cancelled => "ยกเลิก",
+        BookingStatus.VendorRejectedByUser => "ยกเลิก",
+        _ => st.ToString()
+    };
+
+    string VehicleText(VehicleType v) => v switch
+    {
+        VehicleType.Pickup => "รถกระบะ",
+        VehicleType.Van => "รถตู้",
+        VehicleType.Sedan => "รถเก๋ง",
+        _ => v.ToString()
+    };
+
+    bool CanAccept(BookingStatus st) => st == BookingStatus.WaitingDriverAccept;
+    bool CanComplete(BookingStatus st) => st == BookingStatus.DriverAccepted;
+}
+
+<div class="vb-page-head vb-page-hero mb-4">
+    <div class="vb-page-title">
+        <div class="vb-page-icon">🚗</div>
+        <div>
+            <h1 class="vb-page-h1">My Jobs</h1>
+            <div class="vb-page-sub">รายการงานที่ถูกมอบหมายให้คุณ</div>
+        </div>
+    </div>
+
+    <div class="vb-page-meta d-none d-md-flex">
+        <span class="vb-meta-pill">Driver</span>
+        <span class="vb-meta-pill">Jobs</span>
+    </div>
+</div>
+
+@if (TempData["Success"] is string ok && !string.IsNullOrWhiteSpace(ok))
+{
+    <div class="alert alert-success">@ok</div>
+}
+@if (TempData["Error"] is string err && !string.IsNullOrWhiteSpace(err))
+{
+    <div class="alert alert-danger">@err</div>
+}
+
+@if (Model == null || !Model.Any())
+{
+    <div class="vb-card p-3 p-md-4 text-center text-muted">
+        ยังไม่มีงานที่ถูกมอบหมาย
+    </div>
+}
+else
+{
+    <div class="row g-3">
+        @foreach (var b in Model.OrderByDescending(x => x.StartAtUtc))
+        {
+            var startLocal = b.StartAtUtc.ToLocalTime();
+            var endLocal = b.EndAtUtc.ToLocalTime();
+
+            <div class="col-12 col-lg-6">
+                <div class="vb-card p-3 p-md-4 h-100">
+                    <div class="d-flex justify-content-between align-items-start gap-2">
+                        <div>
+                            <div class="fw-semibold" style="font-size:1.05rem;">
+                                งาน #VS-@b.BookingId
+                            </div>
+                            <div class="text-muted small">
+                                @VehicleText(b.VehicleTypeRequested)
+                            </div>
+                        </div>
+
+                        <div class="text-end">
+                            <span class="vb-status @StatusClass(b.Status)">@StatusText(b.Status)</span>
+                            <div class="text-muted small mt-1">
+                                @startLocal.ToString("dd/MM/yyyy HH:mm")
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="vb-divider my-3"></div>
+
+                    <div class="mb-2">
+                        <div class="text-muted small">เส้นทาง</div>
+                        <div class="fw-semibold">@b.PickupLocation → @b.DestinationLocation</div>
+                    </div>
+
+                    <div class="row g-2">
+                        <div class="col-6">
+                            <div class="text-muted small">เริ่ม</div>
+                            <div class="fw-semibold">@startLocal.ToString("dd/MM/yyyy HH:mm")</div>
+                        </div>
+                        <div class="col-6">
+                            <div class="text-muted small">สิ้นสุด</div>
+                            <div class="fw-semibold">@endLocal.ToString("dd/MM/yyyy HH:mm")</div>
+                        </div>
+                    </div>
+
+                    <div class="mt-3">
+                        <div class="text-muted small">ผู้ขอใช้รถ</div>
+                        <div class="fw-semibold">
+                            @(b.Requester?.UsernameTH ?? b.RequesterUserId.ToString())
+                            <span class="text-muted" style="font-weight:400;">
+                                @(string.IsNullOrWhiteSpace(b.Requester?.UserCode) ? "" : $" • {b.Requester.UserCode}")
+                            </span>
+                        </div>
+                    </div>
+
+                    <div class="vb-divider my-3"></div>
+
+                    <div class="d-flex gap-2 justify-content-end flex-wrap">
+                        <a asp-controller="Driver" asp-action="Detail" asp-route-id="@b.BookingId"
+                           class="btn btn-outline-secondary">
+                            ดูรายละเอียด
+                        </a>
+
+                        @* ปุ่มลัดสำหรับคนขับ (optional) *@
+                        @* @if (CanAccept(b.Status))
+                        {
+                            <span class="badge text-bg-light border" style="align-self:center;">
+                                เปิดเข้าไปแล้วกด “รับงาน”
+                            </span>
+                        }
+                        else if (CanComplete(b.Status))
+                        {
+                            <span class="badge text-bg-light border" style="align-self:center;">
+                                เปิดเข้าไปแล้วกด “จบงาน”
+                            </span>
+                        } *@
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+}

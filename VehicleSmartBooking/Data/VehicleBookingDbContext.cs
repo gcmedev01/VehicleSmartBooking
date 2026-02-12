@@ -125,6 +125,8 @@ public sealed class VehicleBookingDbContext : DbContext
             e.ToTable("Drivers", "dbo");
             e.HasKey(x => x.DriverId);
 
+            e.Property(x => x.Phone).HasMaxLength(50);
+
             e.Property(x => x.IsActive).HasDefaultValue(true);
             e.Property(x => x.LastAssignedAtUtc).HasColumnType("datetime2(0)");
             e.Property(x => x.CreatedAtUtc).HasColumnType("datetime2(0)").HasDefaultValueSql("sysutcdatetime()");
@@ -158,6 +160,7 @@ public sealed class VehicleBookingDbContext : DbContext
 
             e.Property(x => x.PickupLocation).HasMaxLength(500).IsRequired();
             e.Property(x => x.DestinationLocation).HasMaxLength(500).IsRequired();
+            e.Property(x => x.RequesterPhone).HasMaxLength(50);
             e.Property(x => x.Purpose).HasMaxLength(500);
             e.Property(x => x.DetailNote).HasMaxLength(2000);
 
@@ -189,6 +192,7 @@ public sealed class VehicleBookingDbContext : DbContext
 
             e.ToTable(t => t.HasCheckConstraint("CK_Bookings_Time", "[EndAtUtc] > [StartAtUtc]"));
 
+// bookings indexes
             e.HasIndex(x => new { x.StartAtUtc, x.EndAtUtc }).HasDatabaseName("IX_Bookings_TimeRange");
             e.HasIndex(x => new { x.RequesterUserId, x.Status }).HasDatabaseName("IX_Bookings_Requester_Status");
         });
@@ -258,6 +262,8 @@ public sealed class VehicleBookingDbContext : DbContext
 
             e.Property(x => x.UserDecision).HasConversion<int>().HasDefaultValue(ExternalUserDecision.Pending);
             e.Property(x => x.UserDecisionAtUtc).HasColumnType("datetime2(0)");
+
+            e.Property(x => x.Note).HasMaxLength(2000);
 
             e.Property(x => x.RentalPlateNo).HasMaxLength(50);
             e.Property(x => x.RentalDriverName).HasMaxLength(200);

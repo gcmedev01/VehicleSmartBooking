@@ -4,8 +4,8 @@
 
 @{
     Layout = "_VehicleBookingLayout";
-    ViewData["Title"] = "My Task";
-    ViewData["ActiveNav"] = "MyTask";
+    ViewData["Title"] = "All Task";
+    ViewData["ActiveNav"] = "AllTasks";
 
     // ---------- UI helpers ----------
     string StatusClass(BookingStatus st) => st switch
@@ -80,8 +80,8 @@
     <div class="vb-page-title">
         <div class="vb-page-icon">🧾</div>
         <div>
-            <h1 class="vb-page-h1">My Task</h1>
-            <div class="vb-page-sub">ค้นหาและติดตามสถานะคำขอของคุณ</div>
+            <h1 class="vb-page-h1">All Task</h1>
+            <div class="vb-page-sub">คำร้องขอทั้งหมด</div>
         </div>
     </div>
 
@@ -233,7 +233,6 @@
                                 <span class="vb-status @StatusClass(b.Status)">@StatusText(b.Status)</span>
                                 <div class="text-muted small mt-1">Req: @(b.Requester?.UsernameTH ?? "-")</div>
                             </td>
-
 
                             <td class="text-end">
                                 <a asp-action="Detail" asp-route-id="@b.BookingId"

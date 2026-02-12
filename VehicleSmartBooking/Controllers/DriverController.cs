@@ -7,7 +7,7 @@ using VehicleBooking.Web.Domain.Services;
 
 namespace VehicleSmartBooking.Controllers
 {
-    [Authorize]
+    [Authorize(Roles = "Driver")]
     [Route("driver")]
     public class DriverController : Controller
     {
@@ -38,6 +38,9 @@ namespace VehicleSmartBooking.Controllers
             var jobs = await _db.Bookings
                 .AsNoTracking()
                 .Include(b => b.Requester)
+                .Include(b => b.AssignedVehicle)
+                .Include(b => b.AssignedDriver)
+                    .ThenInclude(d => d.User)
                 .Where(b => b.AssignedDriverId == driver.DriverId)
                 .OrderByDescending(b => b.StartAtUtc)
                 .ToListAsync();
@@ -58,6 +61,9 @@ namespace VehicleSmartBooking.Controllers
                 .AsNoTracking()
                 .Include(b => b.Requester)
                 .Include(b => b.Attachments)
+                .Include(b => b.AssignedVehicle)
+                .Include(b => b.AssignedDriver)
+                    .ThenInclude(d => d.User)
                 .FirstOrDefaultAsync(b => b.BookingId == id);
 
             if (booking is null) return NotFound();

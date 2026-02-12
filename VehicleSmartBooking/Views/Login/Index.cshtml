@@ -131,3 +131,41 @@
         </aside>
     </div>
 </div>
+
+<div class="modal fade" id="loginErrorModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">เข้าสู่ระบบไม่สำเร็จ</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                @Html.ValidationSummary(excludePropertyErrors: true)
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-primary" data-bs-dismiss="modal">ตกลง</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    @if (!ViewData.ModelState.IsValid)
+    {
+        <script>
+            (() => {
+                const localForm = document.getElementById("localForm");
+                const localChevron = document.getElementById("localChevron");
+                if (localForm && !localForm.classList.contains("is-open")) {
+                    localForm.classList.add("is-open");
+                    if (localChevron) localChevron.textContent = "⌄";
+                }
+
+                const modalEl = document.getElementById("loginErrorModal");
+                if (!modalEl) return;
+                const modal = new bootstrap.Modal(modalEl);
+                modal.show();
+            })();
+        </script>
+    }
+}

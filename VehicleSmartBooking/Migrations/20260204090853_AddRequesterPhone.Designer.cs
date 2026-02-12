@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using VehicleBooking.Web.Data;
 
@@ -11,9 +12,11 @@ using VehicleBooking.Web.Data;
 namespace VehicleSmartBooking.Migrations
 {
     [DbContext(typeof(VehicleBookingDbContext))]
-    partial class VehicleBookingDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260204090853_AddRequesterPhone")]
+    partial class AddRequesterPhone
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -288,10 +291,6 @@ namespace VehicleSmartBooking.Migrations
 
                     b.Property<DateTime?>("LastAssignedAtUtc")
                         .HasColumnType("datetime2(0)");
-
-                    b.Property<string>("Phone")
-                        .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)");
 
                     b.Property<DateTime>("UpdatedAtUtc")
                         .ValueGeneratedOnAdd()

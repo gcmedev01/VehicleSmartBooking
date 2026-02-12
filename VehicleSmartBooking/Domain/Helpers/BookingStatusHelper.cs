@@ -4,12 +4,13 @@ namespace VehicleBooking.Web.Domain.Helpers
 {
     public static class BookingStatusHelper
     {
-        public static bool IsTerminalStatus(BookingStatus status)
+        public static readonly BookingStatus[] TerminalStatuses =
         {
-            return status == BookingStatus.Cancelled
-                || status == BookingStatus.Rejected
-                || status == BookingStatus.Completed
-                || status == BookingStatus.Rated;
-        }
+            BookingStatus.Completed,
+            BookingStatus.Rated,
+            BookingStatus.Rejected,
+            BookingStatus.Cancelled,
+            BookingStatus.VendorRejectedByUser
+        };
     }
 }

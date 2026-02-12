@@ -1,0 +1,135 @@
+﻿@using VehicleBooking.Web.Domain.Entities
+@using VehicleBooking.Web.Domain.Enums
+@model IReadOnlyList<Booking>
+
+@{
+    Layout = "_VehicleBookingLayout";
+    ViewData["Title"] = "Pending Approvals";
+    ViewData["ActiveNav"] = "Approve";
+
+    string StatusClass(BookingStatus st) => st switch
+    {
+        BookingStatus.Completed => "vb-status-completed",
+        BookingStatus.Rated => "vb-status-completed",
+        BookingStatus.Rejected => "vb-status-rejected",
+        BookingStatus.Cancelled => "vb-status-rejected",
+        BookingStatus.VendorRejectedByUser => "vb-status-rejected",
+        _ => "vb-status-pending"
+    };
+
+    string StatusText(BookingStatus st) => st switch
+    {
+        BookingStatus.Draft => "ร่าง",
+        BookingStatus.Submitted => "ส่งคำขอแล้ว",
+        BookingStatus.WaitingApproval => "รออนุมัติ",
+        BookingStatus.WaitingDriverAccept => "รอพนักงานขับรถตอบรับ",
+        BookingStatus.DriverAccepted => "พนักงานขับรถตอบรับ",
+        BookingStatus.WaitingAdminVendorQuotation => "รอเสนอราคาผู้ให้บริการ",
+        BookingStatus.WaitingUserVendorAccept => "รอผู้ขอใช้ยอมรับผู้ให้บริการ",
+        BookingStatus.WaitingAdminVendorConfirm => "รอยืนยันผู้ให้บริการ",
+        BookingStatus.VendorRejectedByUser => "ผู้ขอใช้ปฏิเสธผู้ให้บริการ",
+        BookingStatus.Completed => "เสร็จสิ้น",
+        BookingStatus.Rated => "ให้คะแนนแล้ว",
+        BookingStatus.Rejected => "ถูกปฏิเสธ",
+        BookingStatus.Cancelled => "ยกเลิก",
+        BookingStatus.AdminActionRequired => "รอผู้ดูแลดำเนินการ",
+        _ => st.ToString()
+    };
+
+    string TripChipText(TripType t) => t switch
+    {
+        TripType.InProvince => "ในจังหวัด",
+        TripType.OutProvince => "นอกจังหวัด",
+        _ => t.ToString()
+    };
+
+    string TripChipClass(TripType t) => t == TripType.OutProvince ? "vb-chip vb-chip-alt" : "vb-chip";
+
+    string VehicleText(VehicleType v) => v switch
+    {
+        VehicleType.Pickup => "รถกระบะ",
+        VehicleType.Van => "รถตู้",
+        VehicleType.Sedan => "รถเก๋ง",
+        _ => v.ToString()
+    };
+}
+
+<div class="vb-page-head vb-page-hero mb-4">
+    <div class="vb-page-title">
+        <div class="vb-page-icon">✅</div>
+        <div>
+            <h1 class="vb-page-h1">Pending Approvals</h1>
+            <div class="vb-page-sub">รายการงานที่รอคุณอนุมัติ</div>
+        </div>
+    </div>
+
+    <div class="vb-page-meta d-none d-md-flex">
+        <span class="vb-meta-pill">Tasks</span>
+        <span class="vb-meta-pill">Pending</span>
+    </div>
+</div>
+
+<div class="vb-card p-3 p-md-4">
+    @if (Model == null || Model.Count == 0)
+    {
+        <div class="text-muted">ยังไม่มีงานที่รออนุมัติ</div>
+    }
+    else
+    {
+        <div class="table-responsive">
+            <table class="table align-middle mb-0">
+                <thead>
+                    <tr class="text-muted small">
+                        <th style="width: 110px;">เลขที่</th>
+                        <th>ผู้ขอใช้</th>
+                        <th>ประเภท</th>
+                        <th>ประเภทรถ</th>
+                        <th style="width: 220px;">ช่วงเวลา</th>
+                        <th style="width: 120px;">สถานะ</th>
+                        <th style="width: 90px;"></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var b in Model)
+                    {
+                        var requester = b.Requester?.UsernameTH ?? b.Requester?.UsernameEN ?? b.RequesterUserId.ToString();
+                        var start = b.StartAtUtc.ToLocalTime().ToString("g");
+                        var end = b.EndAtUtc.ToLocalTime().ToString("g");
+
+                        <tr>
+                            <td class="fw-semibold">VS-@b.BookingId</td>
+
+                            <td>
+                                <div class="fw-semibold">@requester</div>
+                                <div class="text-muted small">@b.PickupLocation → @b.DestinationLocation</div>
+                            </td>
+
+                            <td>
+                                <span class="@TripChipClass(b.TripType)">@TripChipText(b.TripType)</span>
+                            </td>
+                            <td>
+                                <span class="vb-veh-pill">@VehicleText(b.VehicleTypeRequested)</span>
+                            </td>
+
+                            <td>
+                                <div class="small"><span class="text-muted">เริ่ม:</span> @start</div>
+                                <div class="small"><span class="text-muted">สิ้นสุด:</span> @end</div>
+                            </td>
+
+                            <td>
+                                <span class="vb-status @StatusClass(b.Status)">@StatusText(b.Status)</span>
+                            </td>
+
+                            <td class="text-end">
+                                <a asp-action="Detail" asp-route-bookingId="@b.BookingId"
+                                   class="btn btn-sm btn-outline-primary">
+                                    ดู
+                                </a>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>

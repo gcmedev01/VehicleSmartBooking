@@ -1,0 +1,191 @@
+@model VehicleSmartBooking.Controllers.AdminController.UsersListVm
+@{
+    Layout = "_VehicleBookingLayout";
+    ViewData["Title"] = "Users";
+    ViewData["ActiveNav"] = "AdminUsers";
+}
+
+<div class="vb-page-head vb-page-hero mb-4">
+    <div class="vb-page-title">
+        <div class="vb-page-icon">??</div>
+        <div>
+            <h1 class="vb-page-h1">Users</h1>
+            <div class="vb-page-sub">Manage users and roles</div>
+        </div>
+    </div>
+</div>
+
+<div class="mb-3">
+    <div class="d-flex justify-content-end">
+        <form asp-action="UpdateUsers" method="post">
+            @Html.AntiForgeryToken()
+            <button type="submit" class="btn btn-ci">
+                Update Users
+            </button>
+        </form>
+    </div>
+    <div class="vb-card p-3  mt-2">
+        <form asp-action="Users" method="get" class="d-flex flex-column gap-3">
+            <input type="text" name="q" value="@Model.Query"
+                   class="form-control"
+                   placeholder="Search" />
+
+            <div class="d-flex flex-wrap gap-2 justify-content-end">
+                <input class="btn-check" type="checkbox" id="roleUser" name="roleUser" value="true"
+                       @(Model.RoleUser ? "checked" : "") />
+                <label class="btn btn-outline-secondary rounded-pill" for="roleUser">User</label>
+
+                <input class="btn-check" type="checkbox" id="roleAdmin" name="roleAdmin" value="true"
+                       @(Model.RoleAdmin ? "checked" : "") />
+                <label class="btn btn-outline-secondary rounded-pill" for="roleAdmin">Admin</label>
+
+                <input class="btn-check" type="checkbox" id="roleDriver" name="roleDriver" value="true"
+                       @(Model.RoleDriver ? "checked" : "") />
+                <label class="btn btn-outline-secondary rounded-pill" for="roleDriver">Driver</label>
+
+                <input class="btn-check" type="checkbox" id="roleApprover" name="roleApprover" value="true"
+                       @(Model.RoleApprover ? "checked" : "") />
+                <label class="btn btn-outline-secondary rounded-pill" for="roleApprover">Approver</label>
+            </div>
+
+            <div class="d-flex justify-content-center">
+                <button type="submit" class="btn btn-secondary btn-sm px-4" style="width:150px;">Filter</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+
+<div class="vb-card p-3">
+    <div class="table-responsive">
+        <table class="table align-middle">
+            <thead>
+                <tr>
+                    <th>User Code</th>
+                    <th>Username TH</th>
+                    <th>Username EN</th>
+                    <th>Function</th>
+                    <th>Dept</th>
+                    <th>Div</th>
+                    <th>Roles</th>
+                    <th class="text-center">Active</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (Model.Users.Count == 0)
+                {
+                    <tr>
+                        <td colspan="9" class="text-center text-muted">No users found</td>
+                    </tr>
+                }
+                else
+                {
+                    foreach (var u in Model.Users)
+                    {
+                        var dotColor = u.IsActive ? "#28a745" : "#adb5bd";
+                        var isDriver = (u.RoleFlags & 4) != 0;
+                        var roleText = "";
+                        if (isDriver)
+                        {
+                            roleText = "Driver";
+                        }
+                        else
+                        {
+                            if ((u.RoleFlags & 1) != 0) roleText += "User, ";
+                            if ((u.RoleFlags & 2) != 0) roleText += "Admin, ";
+                            if ((u.RoleFlags & 8) != 0) roleText += "Approver, ";
+                            roleText = roleText.TrimEnd(' ', ',');
+                            if (string.IsNullOrWhiteSpace(roleText)) roleText = "-";
+                        }
+                        <tr>
+                            <td>@u.UserCode</td>
+                            <td>@(u.UsernameTH ?? "-")</td>
+                            <td>@(u.UsernameEN ?? "-")</td>
+                            <td>@(u.FunctionAbbr ?? "-")</td>
+                            <td>@(u.DeptAbbr ?? "-")</td>
+                            <td>@(u.DivAbbr ?? "-")</td>
+                            <td>@roleText</td>
+                            <td class="text-center">
+                                <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:@dotColor;"></span>
+                            </td>
+                            <td class="text-end">
+                                @if (isDriver)
+                                {
+                                    <span class="btn btn-sm btn-outline-secondary disabled">Driver</span>
+                                }
+                                else
+                                {
+                                    <a asp-action="EditUserRole" asp-route-id="@u.UserId" class="btn btn-sm btn-outline-secondary">Edit Role</a>
+                                }
+                            </td>
+                        </tr>
+                    }
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+@if (Model.TotalPages > 0)
+{
+    var window = 2;
+    var start = Math.Max(1, Model.Page - window);
+    var end = Math.Min(Model.TotalPages, Model.Page + window);
+    var showFirst = start > 1;
+    var showLast = end < Model.TotalPages;
+
+    <nav class="mt-3">
+        <ul class="pagination justify-content-center mb-0">
+            @if (showFirst)
+            {
+                <li class="page-item @(Model.Page == 1 ? "disabled" : "")">
+                    <a class="page-link" asp-action="Users" asp-route-q="@Model.Query" asp-route-roleUser="@Model.RoleUser" asp-route-roleAdmin="@Model.RoleAdmin" asp-route-roleDriver="@Model.RoleDriver" asp-route-roleApprover="@Model.RoleApprover" asp-route-page="1" asp-route-pageSize="@Model.PageSize">First</a>
+                </li>
+            }
+            <li class="page-item @(Model.Page == 1 ? "disabled" : "")">
+                <a class="page-link" asp-action="Users" asp-route-q="@Model.Query" asp-route-roleUser="@Model.RoleUser" asp-route-roleAdmin="@Model.RoleAdmin" asp-route-roleDriver="@Model.RoleDriver" asp-route-roleApprover="@Model.RoleApprover" asp-route-page="@(Model.Page - 1)" asp-route-pageSize="@Model.PageSize">Prev</a>
+            </li>
+
+            @if (showFirst)
+            {
+                <li class="page-item">
+                    <a class="page-link" asp-action="Users" asp-route-q="@Model.Query" asp-route-roleUser="@Model.RoleUser" asp-route-roleAdmin="@Model.RoleAdmin" asp-route-roleDriver="@Model.RoleDriver" asp-route-roleApprover="@Model.RoleApprover" asp-route-page="1" asp-route-pageSize="@Model.PageSize">1</a>
+                </li>
+                if (start > 2)
+                {
+                    <li class="page-item disabled"><span class="page-link">…</span></li>
+                }
+            }
+
+            @for (var i = start; i <= end; i++)
+            {
+                var activeClass = i == Model.Page ? "active" : "";
+                <li class="page-item @activeClass">
+                    <a class="page-link" asp-action="Users" asp-route-q="@Model.Query" asp-route-roleUser="@Model.RoleUser" asp-route-roleAdmin="@Model.RoleAdmin" asp-route-roleDriver="@Model.RoleDriver" asp-route-roleApprover="@Model.RoleApprover" asp-route-page="@i" asp-route-pageSize="@Model.PageSize">@i</a>
+                </li>
+            }
+
+            @if (showLast)
+            {
+                if (end < Model.TotalPages - 1)
+                {
+                    <li class="page-item disabled"><span class="page-link">…</span></li>
+                }
+                <li class="page-item">
+                    <a class="page-link" asp-action="Users" asp-route-q="@Model.Query" asp-route-roleUser="@Model.RoleUser" asp-route-roleAdmin="@Model.RoleAdmin" asp-route-roleDriver="@Model.RoleDriver" asp-route-roleApprover="@Model.RoleApprover" asp-route-page="@Model.TotalPages" asp-route-pageSize="@Model.PageSize">@Model.TotalPages</a>
+                </li>
+            }
+
+            <li class="page-item @(Model.Page == Model.TotalPages ? "disabled" : "")">
+                <a class="page-link" asp-action="Users" asp-route-q="@Model.Query" asp-route-roleUser="@Model.RoleUser" asp-route-roleAdmin="@Model.RoleAdmin" asp-route-roleDriver="@Model.RoleDriver" asp-route-roleApprover="@Model.RoleApprover" asp-route-page="@(Model.Page + 1)" asp-route-pageSize="@Model.PageSize">Next</a>
+            </li>
+            @if (showLast)
+            {
+                <li class="page-item @(Model.Page == Model.TotalPages ? "disabled" : "")">
+                    <a class="page-link" asp-action="Users" asp-route-q="@Model.Query" asp-route-roleUser="@Model.RoleUser" asp-route-roleAdmin="@Model.RoleAdmin" asp-route-roleDriver="@Model.RoleDriver" asp-route-roleApprover="@Model.RoleApprover" asp-route-page="@Model.TotalPages" asp-route-pageSize="@Model.PageSize">Last</a>
+                </li>
+            }
+        </ul>
+    </nav>
+}

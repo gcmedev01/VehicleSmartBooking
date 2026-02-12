@@ -1,0 +1,53 @@
+@model IList<VehicleBooking.Web.Domain.Entities.Booking>
+@{
+    Layout = "_VehicleBookingLayout";
+    ViewData["Title"] = "Admin Worklist";
+    ViewData["ActiveNav"] = "AdminWorklist";
+}
+
+<div class="vb-page-head vb-page-hero mb-4">
+    <div class="vb-page-title">
+        <div class="vb-page-icon">???</div>
+        <div>
+            <h1 class="vb-page-h1">Admin Worklist</h1>
+            <div class="vb-page-sub">Bookings that need admin attention</div>
+        </div>
+    </div>
+</div>
+
+<div class="vb-card p-3">
+    @if (Model == null || !Model.Any())
+    {
+        <div class="text-muted">No items</div>
+    }
+    else
+    {
+        <div class="table-responsive">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Booking #</th>
+                        <th>Requester</th>
+                        <th>Start</th>
+                        <th>Status</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach(var b in Model)
+                    {
+                        <tr>
+                            <td>VS-@b.BookingId</td>
+                            <td>@(b.Requester?.UsernameTH ?? b.Requester?.UsernameEN ?? b.RequesterUserId.ToString())</td>
+                            <td>@b.StartAtUtc.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</td>
+                            <td>@b.Status</td>
+                            <td class="text-end">
+                                <a asp-action="Booking" asp-route-id="@b.BookingId" class="btn btn-sm btn-outline-secondary">Open</a>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>

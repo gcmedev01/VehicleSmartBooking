@@ -6,7 +6,7 @@
     ViewData["Title"] = "Create Driver";
     ViewData["ActiveNav"] = "AdminDrivers";
 
-    var vehicles = ViewBag.Vehicles as List<(int Id, string Text)> ?? new();
+    var vehicles = ViewBag.Vehicles as List<SelectListItem> ?? new();
 }
 
 <div class="vb-page-head vb-page-hero mb-4">
@@ -50,12 +50,8 @@
 
             <div class="col-12 col-md-6">
                 <label class="form-label">Vehicle</label>
-                <select asp-for="VehicleId" class="form-select">
+                <select asp-for="VehicleId" class="form-select" asp-items="vehicles">
                     <option value="">-- เลือกรถ --</option>
-                    @foreach (var v in vehicles)
-                    {
-                        <option value="@v.Id">@v.Text</option>
-                    }
                 </select>
                 <span class="text-danger small">@Html.ValidationMessageFor(m => m.VehicleId)</span>
             </div>
