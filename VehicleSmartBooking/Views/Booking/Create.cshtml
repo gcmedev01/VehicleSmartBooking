@@ -32,9 +32,9 @@
                 <button type="button" class="vb-toggle-btn" data-vb-booking="out">
                     ต่างจังหวัด
                 </button>
-                <button type="button" class="vb-toggle-btn" data-vb-booking="personal">
+                @* <button type="button" class="vb-toggle-btn" data-vb-booking="personal">
                     รถส่วนตัว
-                </button>
+                </button> *@
             </div>
         </div>
 
@@ -60,21 +60,32 @@
             </div>
 
             <div class="row g-3">
+                @{
+                    var departmentValue = ViewBag.Users?.DivAbbr as string;
+                    if (string.IsNullOrWhiteSpace(departmentValue))
+                    {
+                        departmentValue = ViewBag.Users?.DeptAbbr as string;
+                    }
+                    if (string.IsNullOrWhiteSpace(departmentValue))
+                    {
+                        departmentValue = ViewBag.Users?.FunctionAbbr as string;
+                    }
+                }
                 <div class="col-12 col-md-3">
                     <label class="form-label">รหัสพนักงาน</label>
-                    <input type="text" class="form-control" name="EmpCode" value="61130500049" required />
+                    <input type="text" class="form-control" name="EmpCode" value="@((ViewBag.Users?.UserCode as string) ?? string.Empty)" required />
                 </div>
                 <div class="col-12 col-md-5">
                     <label class="form-label">ชื่อ-นามสกุล</label>
-                    <input type="text" class="form-control" name="FullName" value="นาย ธนัญกรณ์ เกษรศิริศิษฐ์" required />
+                    <input type="text" class="form-control" name="FullName" value="@((ViewBag.Users?.UsernameTH as string) ?? string.Empty)" required />
                 </div>
                 <div class="col-12 col-md-4">
                     <label class="form-label">หน่วยงาน</label>
-                    <input type="text" class="form-control" name="Department" value="C-OR-DT" required />
+                    <input type="text" class="form-control" name="Department" value="@(departmentValue ?? string.Empty)" required />
                 </div>
                 <div class="col-12 col-md-4">
                     <label class="form-label">เบอร์โทรติดต่อ</label>
-                    <input type="tel" class="form-control" name="Phone" value="0805152393" required />
+                    <input type="tel" class="form-control" name="Phone" value="" required />
                 </div>
             </div>
         </div>
@@ -251,13 +262,13 @@
             </div>
 
             <!-- PERSONAL placeholder -->
-            <div id="vbPersonalPlaceholder" class="vb-personal mt-4">
+            @* <div id="vbPersonalPlaceholder" class="vb-personal mt-4">
                 <div class="vb-divider my-3"></div>
                 <div class="alert alert-warning mb-0">
                     <div class="fw-semibold">ใช้รถส่วนตัว</div>
                     <div class="small mb-0">ส่วนนี้เว้นไว้ก่อน (สามารถเพิ่ม field/เงื่อนไขภายหลัง)</div>
                 </div>
-            </div>
+            </div> *@
         </div>
 
         <!-- Actions -->

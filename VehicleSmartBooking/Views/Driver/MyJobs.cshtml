@@ -57,14 +57,14 @@
     </div>
 </div>
 
-@if (TempData["Success"] is string ok && !string.IsNullOrWhiteSpace(ok))
+@* @if (TempData["Success"] is string ok && !string.IsNullOrWhiteSpace(ok))
 {
     <div class="alert alert-success">@ok</div>
 }
 @if (TempData["Error"] is string err && !string.IsNullOrWhiteSpace(err))
 {
     <div class="alert alert-danger">@err</div>
-}
+} *@
 
 @if (Model == null || !Model.Any())
 {

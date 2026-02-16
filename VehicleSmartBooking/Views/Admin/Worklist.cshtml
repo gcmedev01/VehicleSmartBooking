@@ -42,7 +42,7 @@
                             <td>@b.StartAtUtc.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</td>
                             <td>@b.Status</td>
                             <td class="text-end">
-                                <a asp-action="Booking" asp-route-id="@b.BookingId" class="btn btn-sm btn-outline-secondary">Open</a>
+                                <a asp-action="Detail" asp-route-id="@b.BookingId" class="btn btn-sm btn-outline-secondary">Open</a>
                             </td>
                         </tr>
                     }

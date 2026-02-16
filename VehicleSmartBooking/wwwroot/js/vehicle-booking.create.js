@@ -10,7 +10,6 @@
     const bookingBtns = $$("[data-vb-booking]");
 
     const outExtra = $("#vbOutExtra");
-    const personalBox = $("#vbPersonalPlaceholder");
     const outTrip = $("#OutTripType");
 
     const btnReset = $("#btnReset");
@@ -111,7 +110,6 @@
 
         // toggle sections
         if (outExtra) outExtra.style.display = (m === "out") ? "block" : "none";
-        if (personalBox) personalBox.style.display = (m === "personal") ? "block" : "none";
 
         // require outTrip only when out
         if (outTrip) {

@@ -64,6 +64,7 @@ namespace VehicleSmartBooking.Controllers
                 var requester = _db.Users.AsNoTracking().SingleOrDefault(u => u.UserCode == userCode && u.IsActive);
                 if (requester != null)
                 {
+                    ViewBag.Users = requester;
                     var preview = BuildApprovalChainAsync(requester.UserId).GetAwaiter().GetResult();
                     ViewBag.ApprovalPreview = preview.Approvers
                         .Select(a => new
