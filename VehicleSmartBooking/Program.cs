@@ -94,7 +94,7 @@ app.UseAuthorization();
 app.MapControllerRoute(
     name: "default",
     pattern: "{controller=Login}/{action=Index}/{id?}")
-    .WithStaticAssets();
+;
 
 
 app.Run();
