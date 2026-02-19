@@ -1,4 +1,4 @@
-using Microsoft.AspNetCore.Authentication.Cookies;
+ï»¿using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.EntityFrameworkCore;
 using VehicleBooking.Web.Data;
 using VehicleBooking.Web.Domain.Options;
@@ -29,7 +29,7 @@ builder.Services
     .AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
     .AddCookie(options =>
     {
-        options.LoginPath = "/account/login"; // default ¶éÒÂÑ§äÁè login
+        options.LoginPath = "/account/login"; // default ï¿½ï¿½ï¿½ï¿½Ñ§ï¿½ï¿½ï¿½ login
         options.AccessDeniedPath = "/home/notpermission";
         options.ExpireTimeSpan = TimeSpan.FromHours(8);
         options.SlidingExpiration = true;
@@ -90,7 +90,6 @@ app.UseSession();
 app.UseAuthentication();
 app.UseAuthorization();
 
-app.MapStaticAssets();
 
 app.MapControllerRoute(
     name: "default",
