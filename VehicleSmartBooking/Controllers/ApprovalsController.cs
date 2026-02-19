@@ -6,6 +6,7 @@ using System.Security.Claims;
 using VehicleBooking.Web.Data;
 using VehicleBooking.Web.Domain.Enums;
 using VehicleBooking.Web.Domain.Entities;
+using VehicleBooking.Web.Domain.Services;
 
 namespace VehicleSmartBooking.Controllers
 {
@@ -14,11 +15,13 @@ namespace VehicleSmartBooking.Controllers
     {
         private readonly VehicleBookingDbContext _db;
         private readonly ILogger<ApprovalsController> _logger;
+        private readonly IEmailNotificationService _emailNotifications;
 
-        public ApprovalsController(VehicleBookingDbContext db, ILogger<ApprovalsController> logger)
+        public ApprovalsController(VehicleBookingDbContext db, ILogger<ApprovalsController> logger, IEmailNotificationService emailNotifications)
         {
             _db = db;
             _logger = logger;
+            _emailNotifications = emailNotifications;
         }
 
         // GET: /Approval/pending
@@ -165,6 +168,10 @@ namespace VehicleSmartBooking.Controllers
             {
                 booking.Status = BookingStatus.WaitingApproval;
             }
+            else if (booking.IsPersonal)
+            {
+                booking.Status = BookingStatus.Completed;
+            }
             else
             {
                 // if booking uses external rental, after approvals it should return to admin to confirm vendor details
@@ -172,6 +179,84 @@ namespace VehicleSmartBooking.Controllers
             }
 
             await _db.SaveChangesAsync();
+
+            try
+            {
+                var pendingApprovals = await _db.BookingApprovals
+                    .AsNoTracking()
+                    .Include(a => a.Approver)
+                    .Where(a => a.BookingId == booking.BookingId && a.Status == ApprovalStatus.Pending && a.Approver.Email != null)
+                    .ToListAsync();
+
+                var nextLevel = pendingApprovals.Count == 0
+                    ? (int?)null
+                    : pendingApprovals.Min(a => a.LevelNo);
+
+                var approverEmails = pendingApprovals
+                    .Where(a => nextLevel.HasValue && a.LevelNo == nextLevel.Value)
+                    .Select(a => a.Approver.Email!)
+                    .ToList();
+
+                if (approverEmails.Count > 0)
+                {
+                    await _emailNotifications.NotifyActionRequiredAsync(
+                        booking,
+                        approverEmails,
+                        "กรุณาอนุมัติใบงาน",
+                        relativeUrl: $"/Approval/Detail/{booking.BookingId}");
+                }
+                else
+                {
+                    var bookingWithRequester = await _db.Bookings
+                        .AsNoTracking()
+                        .Include(b => b.Requester)
+                        .FirstOrDefaultAsync(b => b.BookingId == booking.BookingId);
+
+                    if (bookingWithRequester != null)
+                    {
+                        var adminEmails = await _db.Users
+                            .AsNoTracking()
+                            .Where(u => (u.RoleFlags & 2) != 0 && u.Email != null)
+                            .Select(u => u.Email!)
+                            .ToListAsync();
+
+                        if (!string.IsNullOrWhiteSpace(bookingWithRequester.Requester?.Email))
+                        {
+                            await _emailNotifications.NotifyStatusChangedAsync(
+                                bookingWithRequester,
+                                Array.Empty<string>(),
+                                bookingWithRequester.Requester.Email,
+                                statusChangedAtUtc: bookingWithRequester.UpdatedAtUtc,
+                                relativeUrl: $"/Booking/Detail/{bookingWithRequester.BookingId}");
+                        }
+
+                        if (adminEmails.Count > 0)
+                        {
+                            if (bookingWithRequester.Status == BookingStatus.WaitingAdminVendorConfirm)
+                            {
+                                await _emailNotifications.NotifyActionRequiredAsync(
+                                    bookingWithRequester,
+                                    adminEmails,
+                                    "กรุณายืนยันข้อมูลผู้ให้บริการ",
+                                    relativeUrl: $"/Admin/Detail/{bookingWithRequester.BookingId}");
+                            }
+                            else
+                            {
+                                await _emailNotifications.NotifyStatusChangedAsync(
+                                    bookingWithRequester,
+                                    adminEmails,
+                                    ownerEmail: null,
+                                    statusChangedAtUtc: bookingWithRequester.UpdatedAtUtc,
+                                    relativeUrl: $"/Admin/Detail/{bookingWithRequester.BookingId}");
+                            }
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to send approval notifications for booking {BookingId}", booking.BookingId);
+            }
 
             TempData["Success"] = "Approved successfully.";
             return RedirectToAction(nameof(Detail), new { bookingId });

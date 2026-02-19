@@ -1,0 +1,56 @@
+@model VehicleSmartBooking.Features.Dashboard.Widgets.CostVendor.CostVendorVm
+
+@{
+    var vendorCostUrl = Url.Action("VendorCostTrendData", "AdminDashboard") ?? string.Empty;
+    var personalCostUrl = Url.Action("PersonalCostTrendData", "AdminDashboard") ?? string.Empty;
+}
+
+<div class="row g-3">
+    <div class="col-12">
+        <div class="fw-semibold mb-2">Vendor Cost Trend</div>
+        <div class="dashboard-chart">
+            <canvas class="js-vendor-cost-chart" data-cost-url="@vendorCostUrl"></canvas>
+        </div>
+    </div>
+    <div class="col-12">
+        <div class="fw-semibold mb-2">Personal Claim Cost Trend</div>
+        <div class="dashboard-chart">
+            <canvas class="js-personal-cost-chart" data-cost-url="@personalCostUrl"></canvas>
+        </div>
+    </div>
+    <div class="col-12">
+        <div class="fw-semibold mb-2">Top Vendors</div>
+        @if (Model.TopVendors.Count == 0)
+        {
+            <div class="text-muted">No vendor data.</div>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table table-sm align-middle mb-0">
+                    <thead>
+                        <tr class="text-muted">
+                            <th>Vendor</th>
+                            <th class="text-end">Trips</th>
+                            <th class="text-end">Total Cost</th>
+                            <th class="text-end">Avg / Trip</th>
+                            <th class="text-end">Last Used</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var vendor in Model.TopVendors)
+                        {
+                            <tr>
+                                <td>@vendor.VendorName</td>
+                                <td class="text-end">@vendor.Trips</td>
+                                <td class="text-end">@vendor.TotalCost.ToString("N2")</td>
+                                <td class="text-end">@vendor.AverageCostPerTrip.ToString("N2")</td>
+                                <td class="text-end">@(vendor.LastUsedAtUtc?.ToLocalTime().ToString("dd/MM/yyyy") ?? "-")</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+</div>

@@ -1,0 +1,17 @@
+@model VehicleSmartBooking.Features.Dashboard.DashboardWidgetShellViewModel
+
+<div class="@Model.ColumnClass">
+    <div class="card shadow-sm dashboard-widget is-loading" data-widget-id="@Model.Id" data-widget-url="@Model.EndpointUrl">
+        <div class="card-header d-flex align-items-center justify-content-between">
+            <span class="fw-semibold">@Model.Title</span>
+            <span class="text-muted small">Loading</span>
+        </div>
+        <div class="card-body">
+            <div class="dashboard-widget-body">
+                <div class="d-flex align-items-center justify-content-center py-4">
+                    <div class="spinner-border text-secondary" role="status" aria-label="Loading"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

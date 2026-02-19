@@ -70,6 +70,7 @@
         BookingStatus.WaitingUserVendorAccept => "รอผู้ขอใช้ยอมรับผู้ให้บริการ",
         BookingStatus.WaitingAdminVendorConfirm => "รอยืนยันผู้ให้บริการ",
         BookingStatus.VendorRejectedByUser => "ผู้ขอใช้ปฏิเสธผู้ให้บริการ",
+        BookingStatus.WaitingAdminPersonal => "รอผู้ดูแลอนุมัติรถส่วนตัว",
         BookingStatus.Completed => "เสร็จสิ้น",
         BookingStatus.Rated => "ให้คะแนนแล้ว",
         BookingStatus.Rejected => "ถูกปฏิเสธ",
@@ -114,7 +115,11 @@
     var driverText = Model.AssignedDriver != null ? (Model.AssignedDriver.User?.UsernameTH ?? Model.AssignedDriver.User?.UsernameEN ?? $"#{Model.AssignedDriver.DriverId}") : (Model.AssignedDriverId.HasValue ? $"#{Model.AssignedDriverId}" : "-");
     var driverPhone = !string.IsNullOrWhiteSpace(Model.AssignedDriver?.Phone) ? Model.AssignedDriver.Phone : "-";
 
-    var isExternal = Model.IsExternalRental ? "ผู้ให้บริการภายนอก" : "รถบริษัท";
+    var serviceTypeText = Model.IsPersonal
+        ? "รถส่วนตัว"
+        : Model.IsExternalRental
+            ? "ผู้ให้บริการภายนอก"
+            : "รถบริษัท";
     var tripTypeText = TripText(Model.TripType);
     var vehicleTypeText = VehicleText(Model.VehicleTypeRequested);
     var statusText = StatusText(Model.Status);
@@ -272,7 +277,7 @@ else
                     <div class="row g-2">
                         <div class="col-md-4">
                             <div class="fw-semibold">ประเภทบริการ</div>
-                            <div class="text-muted">@isExternal</div>
+                            <div class="text-muted">@serviceTypeText</div>
                         </div>
                     </div>
 

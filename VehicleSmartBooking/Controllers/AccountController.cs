@@ -138,23 +138,24 @@ namespace VehicleSmartBooking.Controllers
             {
                 if (cred.PasswordChangedAtUtc == null)
                 {
-                    return RedirectToAction(nameof(ChangePassword));
+                    return RedirectToAction(nameof(ChangePassword), new { returnUrl });
                 }
             }
 
-            return RedirectAfterLogin(user);
+            return RedirectAfterLogin(user, returnUrl);
         }
 
         // GET: /account/change-password
         [HttpGet("change-password")]
         [Authorize]
-        public async Task<IActionResult> ChangePassword()
+        public async Task<IActionResult> ChangePassword(string? returnUrl = null)
         {
             var me = await ResolveCurrentUserAsync();
             if (me is null) return Forbid();
 
             var cred = await _db.UserCredentials.AsNoTracking().SingleOrDefaultAsync(x => x.UserId == me.UserId);
             ViewData["Title"] = "Change Password";
+            ViewData["ReturnUrl"] = returnUrl;
             ViewBag.RequireCurrentPassword = cred?.PasswordChangedAtUtc != null;
             return View(new ChangePasswordVm());
         }
@@ -163,12 +164,13 @@ namespace VehicleSmartBooking.Controllers
         [HttpPost("change-password")]
         [Authorize]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> ChangePassword([FromForm] ChangePasswordVm vm)
+        public async Task<IActionResult> ChangePassword([FromForm] ChangePasswordVm vm, string? returnUrl = null)
         {
             var me = await ResolveCurrentUserAsync();
             if (me is null) return Forbid();
 
             ViewData["Title"] = "Change Password";
+            ViewData["ReturnUrl"] = returnUrl;
 
             var cred = await _db.UserCredentials.SingleOrDefaultAsync(x => x.UserId == me.UserId);
             if (cred is null) return Forbid();
@@ -216,7 +218,7 @@ namespace VehicleSmartBooking.Controllers
 
             await _db.SaveChangesAsync();
 
-            return RedirectAfterLogin(me);
+            return RedirectAfterLogin(me, returnUrl);
         }
 
         // POST: /account/logout (layout คุณเรียก Account/Logout)
@@ -238,8 +240,13 @@ namespace VehicleSmartBooking.Controllers
         }
 
         // ---------------- helpers ----------------
-        private IActionResult RedirectAfterLogin(User user)
+        private IActionResult RedirectAfterLogin(User user, string? returnUrl = null)
         {
+            if (!string.IsNullOrWhiteSpace(returnUrl) && Url.IsLocalUrl(returnUrl))
+            {
+                return Redirect(returnUrl);
+            }
+
             var roleFlags = user.RoleFlags;
             bool isDriver = (roleFlags & ROLE_DRIVER) == ROLE_DRIVER;
 

@@ -170,6 +170,7 @@ public sealed class VehicleBookingDbContext : DbContext
 
             e.Property(x => x.Status).HasConversion<int>().HasDefaultValue(BookingStatus.Draft);
             e.Property(x => x.IsExternalRental).HasDefaultValue(false);
+            e.Property(x => x.IsPersonal).HasDefaultValue(false);
 
             e.Property(x => x.CancelledAtUtc).HasColumnType("datetime2(0)");
             e.Property(x => x.CreatedAtUtc).HasColumnType("datetime2(0)").HasDefaultValueSql("sysutcdatetime()");
@@ -285,10 +286,21 @@ public sealed class VehicleBookingDbContext : DbContext
             e.ToTable("DriverRatings", "dbo");
             e.HasKey(x => x.RatingId);
 
-            e.Property(x => x.Score).IsRequired();
+            e.Property(x => x.Score1).IsRequired();
+            e.Property(x => x.Score2).IsRequired();
+            e.Property(x => x.Score3).IsRequired();
+            e.Property(x => x.Score4).IsRequired();
+            e.Property(x => x.Score5).IsRequired();
             e.Property(x => x.Comment).HasMaxLength(1000);
             e.Property(x => x.CreatedAtUtc).HasColumnType("datetime2(0)").HasDefaultValueSql("sysutcdatetime()");
-            e.ToTable(t => t.HasCheckConstraint("CK_Ratings_Score", "[Score] BETWEEN 1 AND 5"));
+            e.ToTable(t =>
+            {
+                t.HasCheckConstraint("CK_Ratings_Score1", "[Score1] BETWEEN 1 AND 4");
+                t.HasCheckConstraint("CK_Ratings_Score2", "[Score2] BETWEEN 1 AND 4");
+                t.HasCheckConstraint("CK_Ratings_Score3", "[Score3] BETWEEN 1 AND 4");
+                t.HasCheckConstraint("CK_Ratings_Score4", "[Score4] BETWEEN 1 AND 4");
+                t.HasCheckConstraint("CK_Ratings_Score5", "[Score5] BETWEEN 1 AND 4");
+            });
 
             e.HasOne(x => x.Booking)
                 .WithOne(b => b.Rating)

@@ -1,0 +1,79 @@
+@model VehicleSmartBooking.Features.Dashboard.Widgets.Operations.ActivityFeedVm
+
+@{
+    var returnUrl = Context.Request.Headers["Referer"].ToString();
+    if (string.IsNullOrWhiteSpace(returnUrl))
+    {
+        returnUrl = (Url.Action("Index", "AdminDashboard") ?? "/AdminDashboard") + Context.Request.QueryString;
+    }
+}
+
+<div class="row g-3">
+    <div class="col-12 col-lg-7">
+        <div class="fw-semibold mb-2">Activity Feed</div>
+        @if (Model.Activities.Count == 0)
+        {
+            <div class="text-muted">No recent activity.</div>
+        }
+        else
+        {
+            <ul class="list-group list-group-flush">
+                @foreach (var item in Model.Activities)
+                {
+                    <li class="list-group-item">
+                        <div class="d-flex justify-content-between align-items-start gap-2">
+                            <div>
+                                <div class="fw-semibold">@item.Title</div>
+                                <div class="text-muted small">@item.Detail</div>
+                                <div class="text-muted small">Source: @item.Source</div>
+                            </div>
+                            <div class="text-muted small text-end">
+                                <div>
+                                    <a class="link-secondary" href="/AdminDashboard/Booking/@item.BookingId?returnUrl=@Uri.EscapeDataString(returnUrl)">#@item.BookingId</a>
+                                </div>
+                                <div>@item.OccurredAtUtc.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</div>
+                            </div>
+                        </div>
+                    </li>
+                }
+            </ul>
+        }
+    </div>
+    <div class="col-12 col-lg-5">
+        <div class="fw-semibold mb-2">Risk List (Next 6 Hours)</div>
+        @if (Model.Risks.Count == 0)
+        {
+            <div class="text-muted">No risks detected.</div>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table table-sm align-middle mb-0">
+                    <thead>
+                        <tr class="text-muted">
+                            <th>Booking</th>
+                            <th>Requester</th>
+                            <th>Status</th>
+                            <th>Reason</th>
+                            <th class="text-end">Start</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var risk in Model.Risks)
+                        {
+                            <tr>
+                                <td>
+                                    <a class="link-secondary" href="/AdminDashboard/Booking/@risk.BookingId?returnUrl=@Uri.EscapeDataString(returnUrl)">#@risk.BookingId</a>
+                                </td>
+                                <td>@risk.RequesterName</td>
+                                <td>@risk.Status</td>
+                                <td>@risk.Reason</td>
+                                <td class="text-end">@risk.StartAtUtc.ToLocalTime().ToString("dd/MM HH:mm")</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+</div>

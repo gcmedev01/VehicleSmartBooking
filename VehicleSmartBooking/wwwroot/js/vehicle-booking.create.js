@@ -17,6 +17,12 @@
     const startAtInput = form?.querySelector("input[name='StartAt']");
     const endAtInput = form?.querySelector("input[name='EndAt']");
     const vehicleTypeInputs = $$('input[name="VehicleType"]');
+    const serviceOptionInput = $("#ServiceOption");
+    const choiceModalEl = $("#vbServiceChoiceModal");
+    const choiceButtons = $$('[data-vb-choice]');
+
+    let lastAvailability = null;
+    let isSubmitting = false;
 
     // Guard: ถ้าไม่ใช่หน้า Create ก็ออก
     if (!form && !modeHidden && bookingBtns.length === 0) return;
@@ -48,6 +54,8 @@
         const endAt = endAtInput?.value || "";
 
         if (!vehicleType || !startAt || !endAt) {
+            lastAvailability = null;
+            if (serviceOptionInput) serviceOptionInput.value = "";
             setAvailabilityState("", null);
             return;
         }
@@ -55,11 +63,15 @@
         const startDate = new Date(startAt);
         const endDate = new Date(endAt);
         if (!startDate.getTime() || !endDate.getTime()) {
+            lastAvailability = null;
+            if (serviceOptionInput) serviceOptionInput.value = "";
             setAvailabilityState("กรุณาเลือกวันและเวลาให้ถูกต้อง", "warning");
             return;
         }
 
         if (endDate <= startDate) {
+            lastAvailability = null;
+            if (serviceOptionInput) serviceOptionInput.value = "";
             setAvailabilityState("เวลาสิ้นสุดต้องมากกว่าเวลาเริ่มต้น", "warning");
             return;
         }
@@ -70,16 +82,22 @@
             const url = `/booking/availability?vehicleType=${encodeURIComponent(vehicleType)}&startAt=${encodeURIComponent(startAt)}&endAt=${encodeURIComponent(endAt)}`;
             const response = await fetch(url, { headers: { "Accept": "application/json" } });
             if (!response.ok) {
+                lastAvailability = null;
+                if (serviceOptionInput) serviceOptionInput.value = "";
                 setAvailabilityState("ไม่สามารถตรวจสอบรถว่างได้ในขณะนี้", "warning");
                 return;
             }
 
             const result = await response.json();
             if (!result?.ok) {
+                lastAvailability = null;
+                if (serviceOptionInput) serviceOptionInput.value = "";
                 const message = result?.message || "กรุณาตรวจสอบข้อมูลที่กรอก";
                 setAvailabilityState(message, "warning");
                 return;
             }
+
+            lastAvailability = result;
 
             if (result.total === 0) {
                 setAvailabilityState("ไม่พบรถบริษัทในประเภทรถนี้", "warning");
@@ -87,12 +105,15 @@
             }
 
             if (result.available > 0) {
+                if (serviceOptionInput) serviceOptionInput.value = "";
                 setAvailabilityState(`มีรถว่าง ${result.available} จาก ${result.total} คันในช่วงเวลาที่เลือก`, "success");
                 return;
             }
 
             setAvailabilityState("ไม่มีรถว่างในช่วงเวลานี้ ระบบจะส่งคำขอไปผู้ให้บริการภายนอก", "danger");
         } catch {
+            lastAvailability = null;
+            if (serviceOptionInput) serviceOptionInput.value = "";
             setAvailabilityState("ไม่สามารถตรวจสอบรถว่างได้ในขณะนี้", "warning");
         }
     }
@@ -122,6 +143,51 @@
         // if (form) $$("input,select,textarea", form).forEach(el => { ... });
     }
 
+    function shouldAskServiceChoice() {
+        const mode = (modeHidden?.value || "in").toLowerCase();
+        if (mode !== "out") return false;
+        if (!lastAvailability?.ok) return false;
+        if (lastAvailability.total === 0) return true;
+        return lastAvailability.available === 0;
+    }
+
+    function showServiceChoiceModal() {
+        if (!choiceModalEl) return false;
+        const modal = bootstrap?.Modal ? bootstrap.Modal.getOrCreateInstance(choiceModalEl) : null;
+        if (!modal) return false;
+        modal.show();
+        return true;
+    }
+
+    if (form) {
+        form.addEventListener("submit", (e) => {
+            if (isSubmitting) return;
+
+            const currentChoice = (serviceOptionInput?.value || "").toLowerCase();
+            if (shouldAskServiceChoice() && currentChoice !== "personal" && currentChoice !== "external") {
+                e.preventDefault();
+                showServiceChoiceModal();
+            }
+        });
+    }
+
+    choiceButtons.forEach(btn => {
+        btn.addEventListener("click", () => {
+            const choice = (btn.getAttribute("data-vb-choice") || "").toLowerCase();
+            if (!choice) return;
+
+            if (serviceOptionInput) serviceOptionInput.value = choice;
+
+            const modal = choiceModalEl && bootstrap?.Modal ? bootstrap.Modal.getOrCreateInstance(choiceModalEl) : null;
+            if (modal) modal.hide();
+
+            if (form) {
+                isSubmitting = true;
+                form.requestSubmit();
+            }
+        });
+    });
+
     // Click on booking mode buttons
     document.addEventListener("click", (e) => {
         const btn = e.target.closest("[data-vb-booking]");
@@ -141,6 +207,8 @@
 
             // reset mode to "in"
             setBookingMode("in");
+            if (serviceOptionInput) serviceOptionInput.value = "";
+            lastAvailability = null;
             setAvailabilityState("", null);
 
             // ถ้าใช้ custom UI ที่ไม่ใช่ native reset เช่น select2 ต้อง reset เพิ่มเองตรงนี้

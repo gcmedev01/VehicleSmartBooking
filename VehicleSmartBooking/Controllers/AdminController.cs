@@ -23,17 +23,19 @@ namespace VehicleSmartBooking.Controllers
         private readonly VehicleBookingDbContext _db;
         private readonly ILogger<AdminController> _logger;
         private readonly IPasswordHasher _hasher;
+        private readonly IEmailNotificationService _emailNotifications;
 
         private const int ROLE_USER = 1;
         private const int ROLE_DRIVER = 4;
         private const int ROLE_ADMIN = 2;
         private const int ROLE_APPROVER = 8;
 
-        public AdminController(VehicleBookingDbContext db, ILogger<AdminController> logger, IPasswordHasher hasher)
+        public AdminController(VehicleBookingDbContext db, ILogger<AdminController> logger, IPasswordHasher hasher, IEmailNotificationService emailNotifications)
         {
             _db = db;
             _logger = logger;
             _hasher = hasher;
+            _emailNotifications = emailNotifications;
         }
 
         // ===== Operations =====
@@ -53,7 +55,7 @@ namespace VehicleSmartBooking.Controllers
         {
             ViewData["ActiveNav"] = "AdminWorklist";
 
-            var statuses = new[] { BookingStatus.WaitingAdminVendorQuotation, BookingStatus.WaitingAdminVendorConfirm, BookingStatus.AdminActionRequired };
+            var statuses = new[] { BookingStatus.WaitingAdminVendorQuotation, BookingStatus.WaitingAdminVendorConfirm, BookingStatus.WaitingAdminPersonal, BookingStatus.AdminActionRequired };
 
             var items = await _db.Bookings
                 .AsNoTracking()
@@ -107,7 +109,10 @@ namespace VehicleSmartBooking.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> SendVendorQuote(long id, VendorQuoteModel model)
         {
-            var booking = await _db.Bookings.Include(b => b.ExternalRental).SingleOrDefaultAsync(b => b.BookingId == id);
+            var booking = await _db.Bookings
+                .Include(b => b.ExternalRental)
+                .Include(b => b.Requester)
+                .SingleOrDefaultAsync(b => b.BookingId == id);
             if (booking == null) return NotFound();
 
             if (model == null)
@@ -156,6 +161,15 @@ namespace VehicleSmartBooking.Controllers
                 booking.UpdatedAtUtc = now;
 
                 await _db.SaveChangesAsync();
+
+                if (!string.IsNullOrWhiteSpace(booking.Requester?.Email))
+                {
+                    await _emailNotifications.NotifyActionRequiredAsync(
+                        booking,
+                        new[] { booking.Requester.Email },
+                        "กรุณายอมรับหรือปฏิเสธผู้ให้บริการ",
+                        relativeUrl: $"/Booking/Detail/{booking.BookingId}");
+                }
 
                 TempData["Success"] = "Vendor quote sent.";
             }
@@ -207,7 +221,10 @@ namespace VehicleSmartBooking.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> ForceComplete(long id)
         {
-            var booking = await _db.Bookings.Include(b => b.ExternalRental).SingleOrDefaultAsync(b => b.BookingId == id);
+            var booking = await _db.Bookings
+                .Include(b => b.ExternalRental)
+                .Include(b => b.Requester)
+                .SingleOrDefaultAsync(b => b.BookingId == id);
             if (booking == null) return NotFound();
 
             booking.Status = BookingStatus.Completed;
@@ -219,6 +236,24 @@ namespace VehicleSmartBooking.Controllers
             }
 
             await _db.SaveChangesAsync();
+
+            if (!string.IsNullOrWhiteSpace(booking.Requester?.Email))
+            {
+                try
+                {
+                    await _emailNotifications.NotifyStatusChangedAsync(
+                        booking,
+                        Array.Empty<string>(),
+                        booking.Requester.Email,
+                        statusChangedAtUtc: booking.UpdatedAtUtc,
+                        relativeUrl: $"/Booking/Detail/{booking.BookingId}");
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Failed to send force complete email for booking {BookingId}", booking.BookingId);
+                }
+            }
+
             return RedirectToAction(nameof(Booking), new { id });
         }
 
@@ -387,6 +422,7 @@ namespace VehicleSmartBooking.Controllers
                 DriverCode = d.User.UserCode,
                 DriverNameTH = d.User.UsernameTH,
                 DriverNameEN = d.User.UsernameEN,
+                Phone = d.Phone,
                 VehicleId = d.VehicleId,
                 IsActive = d.IsActive
             };
@@ -421,6 +457,7 @@ namespace VehicleSmartBooking.Controllers
             // update driver row
             d.VehicleId = vm.VehicleId;
             d.IsActive = vm.IsActive;
+            d.Phone = string.IsNullOrWhiteSpace(vm.Phone) ? null : vm.Phone.Trim();
             d.UpdatedAtUtc = DateTime.UtcNow;
 
             await _db.SaveChangesAsync();
@@ -1024,6 +1061,7 @@ namespace VehicleSmartBooking.Controllers
             {
                 UserId = user.UserId,
                 VehicleId = vm.VehicleId,
+                Phone = string.IsNullOrWhiteSpace(vm.Phone) ? null : vm.Phone.Trim(),
                 IsActive = true,
                 LastAssignedAtUtc = null,
                 CreatedAtUtc = DateTime.UtcNow,
@@ -1265,6 +1303,8 @@ namespace VehicleSmartBooking.Controllers
             public string? DriverNameTH { get; set; }
             public string? DriverNameEN { get; set; }
 
+            public string? Phone { get; set; }
+
             [Required]
             public int VehicleId { get; set; }
 
@@ -1337,6 +1377,196 @@ namespace VehicleSmartBooking.Controllers
             public string? PositionText100TH { get; set; }
             public string? PositionText100EN { get; set; }
             public string? LineManagerID { get; set; }
+        }
+
+        // POST: /Admin/ApprovePersonal/{id}
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> ApprovePersonal(long id)
+        {
+            var booking = await _db.Bookings
+                .Include(b => b.Requester)
+                .SingleOrDefaultAsync(b => b.BookingId == id);
+
+            if (booking == null) return NotFound();
+
+            if (!booking.IsPersonal || booking.Status != BookingStatus.WaitingAdminPersonal)
+            {
+                TempData["Error"] = "Booking is not waiting for personal vehicle approval.";
+                return RedirectToAction(nameof(Detail), new { id });
+            }
+
+            booking.Status = BookingStatus.WaitingApproval;
+            booking.UpdatedAtUtc = DateTime.UtcNow;
+
+            await _db.SaveChangesAsync();
+
+            await CreateApprovalsFromLineManagerChainAsync(booking.BookingId, booking.RequesterUserId);
+
+            try
+            {
+                var pendingApprovals = await _db.BookingApprovals
+                    .AsNoTracking()
+                    .Include(a => a.Approver)
+                    .Where(a => a.BookingId == booking.BookingId && a.Status == ApprovalStatus.Pending && a.Approver.Email != null)
+                    .ToListAsync();
+
+                var nextLevel = pendingApprovals.Count == 0
+                    ? (int?)null
+                    : pendingApprovals.Min(a => a.LevelNo);
+
+                var approverEmails = pendingApprovals
+                    .Where(a => nextLevel.HasValue && a.LevelNo == nextLevel.Value)
+                    .Select(a => a.Approver.Email!)
+                    .ToList();
+
+                if (approverEmails.Count > 0)
+                {
+                    await _emailNotifications.NotifyActionRequiredAsync(
+                        booking,
+                        approverEmails,
+                        "กรุณาอนุมัติใบงาน",
+                        relativeUrl: $"/Approval/Detail/{booking.BookingId}");
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to send approval notification for booking {BookingId}", booking.BookingId);
+            }
+
+            TempData["Success"] = "Personal vehicle approved and sent for approvals.";
+            return RedirectToAction(nameof(Detail), new { id });
+        }
+
+        private async Task CreateApprovalsFromLineManagerChainAsync(long bookingId, int requesterUserId)
+        {
+            var now = DateTime.UtcNow;
+
+            var alreadyHasApprovals = await _db.BookingApprovals.AsNoTracking().AnyAsync(a => a.BookingId == bookingId);
+            if (alreadyHasApprovals) return;
+
+            var chain = await BuildApprovalChainAsync(requesterUserId);
+            if (chain.IsAutoApproved)
+            {
+                var bookingAuto = await _db.Bookings.SingleAsync(b => b.BookingId == bookingId);
+                bookingAuto.Status = bookingAuto.IsExternalRental ? BookingStatus.WaitingAdminVendorConfirm : BookingStatus.WaitingDriverAccept;
+                bookingAuto.UpdatedAtUtc = now;
+                await _db.SaveChangesAsync();
+                return;
+            }
+
+            if (chain.IsAdminActionRequired || chain.Approvers.Count == 0)
+            {
+                var booking = await _db.Bookings.SingleAsync(b => b.BookingId == bookingId);
+                booking.Status = BookingStatus.AdminActionRequired;
+                booking.UpdatedAtUtc = now;
+                await _db.SaveChangesAsync();
+                return;
+            }
+
+            _db.BookingApprovals.AddRange(
+                chain.Approvers.Select(a => new BookingApproval
+                {
+                    BookingId = bookingId,
+                    ApproverUserId = a.User.UserId,
+                    LevelNo = a.LevelNo,
+                    Status = ApprovalStatus.Pending,
+                    CreatedAtUtc = now
+                })
+            );
+
+            await _db.SaveChangesAsync();
+        }
+
+        private async Task<ApprovalChainResult> BuildApprovalChainAsync(int requesterUserId)
+        {
+            var requester = await _db.Users.AsNoTracking().SingleAsync(u => u.UserId == requesterUserId);
+
+            ApproverRole GetRole(User? u)
+            {
+                if (u == null) return ApproverRole.Staff;
+                var pos = (u.PositionEN ?? string.Empty).Trim();
+                if (pos.StartsWith("Acting ", StringComparison.OrdinalIgnoreCase))
+                {
+                    pos = pos.Substring("Acting ".Length).Trim();
+                }
+                if (pos.Equals("Section Manager", StringComparison.OrdinalIgnoreCase)) return ApproverRole.SectionManager;
+                if (pos.Equals("Division Manager", StringComparison.OrdinalIgnoreCase)) return ApproverRole.DM;
+                if (pos.Equals("Vice President", StringComparison.OrdinalIgnoreCase)) return ApproverRole.VP;
+                if (pos.Equals("Deputy Managing Director", StringComparison.OrdinalIgnoreCase)) return ApproverRole.DMD;
+                if (pos.Equals("Managing Director", StringComparison.OrdinalIgnoreCase)) return ApproverRole.MD;
+                return ApproverRole.Staff;
+            }
+
+            async Task<User?> GetManagerAsync(User u)
+            {
+                if (!u.LineManagerId.HasValue) return null;
+                return await _db.Users.AsNoTracking().SingleOrDefaultAsync(x => x.UserId == u.LineManagerId.Value);
+            }
+
+            var requesterRole = GetRole(requester);
+            var lm1 = await GetManagerAsync(requester);
+            var lm2 = lm1 != null ? await GetManagerAsync(lm1) : null;
+            var lm3 = lm2 != null ? await GetManagerAsync(lm2) : null;
+            var lm4 = lm3 != null ? await GetManagerAsync(lm3) : null;
+
+            var approvals = new List<ApprovalCandidate>();
+
+            if (requesterRole == ApproverRole.DMD || requesterRole == ApproverRole.MD)
+            {
+                return new ApprovalChainResult(approvals, IsAutoApproved: true, IsAdminActionRequired: false);
+            }
+
+            if (requesterRole == ApproverRole.Staff && GetRole(lm1) == ApproverRole.DMD)
+            {
+                approvals.Add(new ApprovalCandidate(lm1!, 1));
+            }
+            else if (requesterRole == ApproverRole.DM)
+            {
+                if (GetRole(lm1) == ApproverRole.VP) approvals.Add(new ApprovalCandidate(lm1!, 1));
+                if (GetRole(lm2) == ApproverRole.DMD) approvals.Add(new ApprovalCandidate(lm2!, 2));
+            }
+            else if (requesterRole == ApproverRole.VP)
+            {
+                if (GetRole(lm1) == ApproverRole.DMD) approvals.Add(new ApprovalCandidate(lm1!, 1));
+            }
+            else
+            {
+                var dm = lm1;
+                var vp = lm2;
+                var dmd = lm3;
+
+                if (GetRole(lm1) == ApproverRole.SectionManager)
+                {
+                    dm = lm2;
+                    vp = lm3;
+                    dmd = lm4;
+                }
+
+                if (GetRole(dm) == ApproverRole.DM) approvals.Add(new ApprovalCandidate(dm!, 1));
+                if (GetRole(vp) == ApproverRole.VP) approvals.Add(new ApprovalCandidate(vp!, 2));
+                if (GetRole(dmd) == ApproverRole.DMD) approvals.Add(new ApprovalCandidate(dmd!, 3));
+            }
+
+            if (approvals.Count == 0)
+            {
+                return new ApprovalChainResult(approvals, IsAutoApproved: false, IsAdminActionRequired: true);
+            }
+
+            return new ApprovalChainResult(approvals, IsAutoApproved: false, IsAdminActionRequired: false);
+        }
+
+        private sealed record ApprovalCandidate(User User, int LevelNo);
+        private sealed record ApprovalChainResult(List<ApprovalCandidate> Approvers, bool IsAutoApproved, bool IsAdminActionRequired);
+
+        private enum ApproverRole
+        {
+            Staff = 0,
+            SectionManager = 1,
+            DM = 2,
+            VP = 3,
+            DMD = 4,
+            MD = 5
         }
     }
 }

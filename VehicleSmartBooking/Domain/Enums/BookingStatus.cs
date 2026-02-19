@@ -12,6 +12,7 @@ public enum BookingStatus : int
     WaitingUserVendorAccept = 21,
     VendorRejectedByUser = 22,
     WaitingAdminVendorConfirm = 23,
+    WaitingAdminPersonal = 24,
 
     Completed = 30,
     Rated = 31,

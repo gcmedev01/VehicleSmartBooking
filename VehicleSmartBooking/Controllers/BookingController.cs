@@ -8,6 +8,8 @@ using VehicleBooking.Web.Data;
 using VehicleBooking.Web.Domain.Entities;
 using VehicleBooking.Web.Domain.Enums;
 using VehicleBooking.Web.Domain.Helpers;
+using VehicleBooking.Web.Domain.Services;
+using VehicleSmartBooking.Models;
 
 namespace VehicleSmartBooking.Controllers
 {
@@ -17,12 +19,14 @@ namespace VehicleSmartBooking.Controllers
         private readonly VehicleBookingDbContext _db;
         private readonly IWebHostEnvironment _env;
         private readonly ILogger<BookingController> _logger;
+        private readonly IEmailNotificationService _emailNotifications;
 
-        public BookingController(VehicleBookingDbContext db, IWebHostEnvironment env, ILogger<BookingController> logger)
+        public BookingController(VehicleBookingDbContext db, IWebHostEnvironment env, ILogger<BookingController> logger, IEmailNotificationService emailNotifications)
         {
             _db = db;
             _env = env;
             _logger = logger;
+            _emailNotifications = emailNotifications;
         }
 
         public class BookingFormModel
@@ -36,6 +40,7 @@ namespace VehicleSmartBooking.Controllers
             // Booking meta
             public string? BookingMode { get; set; } // "in" | "out" | "personal"
             public string? VehicleType { get; set; } // "pickup","van","sedan"
+            public string? ServiceOption { get; set; } // "external" | "personal"
 
             // Details
             public string? RefNo { get; set; }
@@ -132,6 +137,7 @@ namespace VehicleSmartBooking.Controllers
                 .Include(b => b.Approvals)
                 .ThenInclude(a => a.Approver)
                 .Include(b => b.ExternalRental)
+                .Include(b => b.Rating)
                 // include assigned driver and vehicle to show details in view
                 .Include(b => b.AssignedDriver)
                     .ThenInclude(d => d.User)
@@ -140,12 +146,97 @@ namespace VehicleSmartBooking.Controllers
 
             if (booking is null) return NotFound();
 
+            var userCode = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            var isRequester = !string.IsNullOrWhiteSpace(userCode) &&
+                              string.Equals(booking.Requester?.UserCode, userCode, StringComparison.OrdinalIgnoreCase);
+
             // mark layout active nav for Detail -> MyTask
             ViewData["ActiveNav"] = "MyTask";
 
             return View(booking);
         }
 
+        [Authorize]
+        [HttpGet("/booking/rate/{id:long}")]
+        public async Task<IActionResult> Rate(long id)
+        {
+            var booking = await _db.Bookings
+                .Include(b => b.Requester)
+                .Include(b => b.AssignedDriver)
+                    .ThenInclude(d => d.User)
+                .Include(b => b.AssignedVehicle)
+                .Include(b => b.Rating)
+                .FirstOrDefaultAsync(b => b.BookingId == id);
+
+            if (booking is null) return NotFound();
+
+            var userCode = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            var isRequester = !string.IsNullOrWhiteSpace(userCode) &&
+                              string.Equals(booking.Requester?.UserCode, userCode, StringComparison.OrdinalIgnoreCase);
+
+            if (!isRequester || booking.Status != BookingStatus.Completed || booking.IsPersonal || !booking.AssignedDriverId.HasValue || booking.Rating != null)
+            {
+                return RedirectToAction(nameof(Detail), new { id });
+            }
+
+            ViewData["ActiveNav"] = "MyTask";
+
+            return View(new BookingRatingViewModel { Booking = booking });
+        }
+
+        [Authorize]
+        [HttpPost("/booking/rate/{id:long}")]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> Rate(long id, [FromForm] BookingRatingViewModel model)
+        {
+            var booking = await _db.Bookings
+                .Include(b => b.Requester)
+                .Include(b => b.AssignedDriver)
+                .Include(b => b.AssignedVehicle)
+                .Include(b => b.Rating)
+                .FirstOrDefaultAsync(b => b.BookingId == id);
+
+            if (booking is null) return NotFound();
+
+            var userCode = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            var isRequester = !string.IsNullOrWhiteSpace(userCode) &&
+                              string.Equals(booking.Requester?.UserCode, userCode, StringComparison.OrdinalIgnoreCase);
+
+            if (!isRequester || booking.Status != BookingStatus.Completed || booking.IsPersonal || !booking.AssignedDriverId.HasValue || booking.Rating != null)
+            {
+                return RedirectToAction(nameof(Detail), new { id });
+            }
+
+            if (!ModelState.IsValid)
+            {
+                model.Booking = booking;
+                ViewData["ActiveNav"] = "MyTask";
+                return View(model);
+            }
+
+            var now = DateTime.UtcNow;
+
+            var rating = new DriverRating
+            {
+                BookingId = booking.BookingId,
+                DriverId = booking.AssignedDriverId.Value,
+                Score1 = model.Score1!.Value,
+                Score2 = model.Score2!.Value,
+                Score3 = model.Score3!.Value,
+                Score4 = model.Score4!.Value,
+                Score5 = model.Score5!.Value,
+                Comment = string.IsNullOrWhiteSpace(model.Comment) ? null : model.Comment.Trim(),
+                CreatedAtUtc = now
+            };
+
+            _db.DriverRatings.Add(rating);
+            booking.Status = BookingStatus.Rated;
+            booking.UpdatedAtUtc = now;
+
+            await _db.SaveChangesAsync();
+
+            return RedirectToAction(nameof(Detail), new { id });
+        }
 
         [HttpPost]
         [ValidateAntiForgeryToken]
@@ -164,6 +255,9 @@ namespace VehicleSmartBooking.Controllers
                 "van" => VehicleType.Van,
                 _ => VehicleType.Sedan
             };
+
+            var usePersonal = string.Equals(model.ServiceOption?.Trim(), "personal", StringComparison.OrdinalIgnoreCase)
+                              && tripType == TripType.OutProvince;
 
             if (!DateTime.TryParse(model.StartAt, out var startLocal) ||
                 !DateTime.TryParse(model.EndAt, out var endLocal))
@@ -217,6 +311,19 @@ namespace VehicleSmartBooking.Controllers
                 await _db.SaveChangesAsync();
 
                 await SaveAttachmentsAsync(booking.BookingId, requester.UserId, Attachments);
+
+                if (usePersonal)
+                {
+                    booking.Status = BookingStatus.WaitingAdminPersonal;
+                    booking.IsPersonal = true;
+                    booking.IsExternalRental = false;
+                    booking.UpdatedAtUtc = now;
+
+                    await _db.SaveChangesAsync();
+                    await tx.CommitAsync();
+
+                    return RedirectToAction(nameof(Detail), new { id = booking.BookingId });
+                }
 
                 // attempt assignment but do not let assignment errors prevent booking creation
                 var assignResult = (Assigned: false, VehicleId: (int?)null, DriverId: (int?)null);
@@ -292,6 +399,60 @@ namespace VehicleSmartBooking.Controllers
                 booking.UpdatedAtUtc = now;
                 await _db.SaveChangesAsync();
                 await tx.CommitAsync();
+
+                var adminEmails = await _db.Users
+                    .AsNoTracking()
+                    .Where(u => (u.RoleFlags & 2) != 0 && u.Email != null)
+                    .Select(u => u.Email!)
+                    .ToListAsync();
+
+                try
+                {
+                    await _emailNotifications.NotifyStatusChangedAsync(
+                        booking,
+                        adminEmails,
+                        ownerEmail: null,
+                        statusChangedAtUtc: booking.UpdatedAtUtc,
+                        relativeUrl: $"/Admin/Detail/{booking.BookingId}");
+
+                    await _emailNotifications.NotifyStatusChangedAsync(
+                        booking,
+                        Array.Empty<string>(),
+                        requester.Email,
+                        statusChangedAtUtc: booking.UpdatedAtUtc,
+                        relativeUrl: $"/Booking/Detail/{booking.BookingId}");
+
+                    if (booking.Status == BookingStatus.WaitingApproval && !booking.IsExternalRental)
+                    {
+                        var pendingApprovals = await _db.BookingApprovals
+                            .AsNoTracking()
+                            .Include(a => a.Approver)
+                            .Where(a => a.BookingId == booking.BookingId && a.Status == ApprovalStatus.Pending && a.Approver.Email != null)
+                            .ToListAsync();
+
+                        var nextLevel = pendingApprovals.Count == 0
+                            ? (int?)null
+                            : pendingApprovals.Min(a => a.LevelNo);
+
+                        var approverEmails = pendingApprovals
+                            .Where(a => nextLevel.HasValue && a.LevelNo == nextLevel.Value)
+                            .Select(a => a.Approver.Email!)
+                            .ToList();
+
+                        if (approverEmails.Count > 0)
+                        {
+                            await _emailNotifications.NotifyActionRequiredAsync(
+                                booking,
+                                approverEmails,
+                                "กรุณาอนุมัติใบงาน",
+                                relativeUrl: $"/Approval/Detail/{booking.BookingId}");
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Failed to send booking create email for booking {BookingId}", booking.BookingId);
+                }
 
                 return RedirectToAction(nameof(Detail), new { id = booking.BookingId });
             }
@@ -518,7 +679,7 @@ namespace VehicleSmartBooking.Controllers
 
             if (!type.HasValue)
             {
-                return Ok(new { ok = false, message = "กรุณาเลือกประเภทรถ" });
+                return Ok(new { ok = false, message = "กรุณาเลือกประเถทรถ" });
             }
 
             if (!DateTime.TryParse(startAt, out var startLocal) ||
@@ -659,6 +820,50 @@ namespace VehicleSmartBooking.Controllers
 
             // create approvals (reuse existing helper)
             await CreateApprovalsFromLineManagerChainAsync(booking.BookingId, booking.RequesterUserId);
+
+            var adminEmails = await _db.Users
+                .AsNoTracking()
+                .Where(u => (u.RoleFlags & 2) != 0 && u.Email != null)
+                .Select(u => u.Email!)
+                .ToListAsync();
+
+            try
+            {
+                await _emailNotifications.NotifyStatusChangedAsync(
+                    booking,
+                    adminEmails,
+                    ownerEmail: null,
+                    statusChangedAtUtc: booking.UpdatedAtUtc,
+                    relativeUrl: $"/Admin/Detail/{booking.BookingId}");
+
+                var pendingApprovals = await _db.BookingApprovals
+                    .AsNoTracking()
+                    .Include(a => a.Approver)
+                    .Where(a => a.BookingId == booking.BookingId && a.Status == ApprovalStatus.Pending && a.Approver.Email != null)
+                    .ToListAsync();
+
+                var nextLevel = pendingApprovals.Count == 0
+                    ? (int?)null
+                    : pendingApprovals.Min(a => a.LevelNo);
+
+                var approverEmails = pendingApprovals
+                    .Where(a => nextLevel.HasValue && a.LevelNo == nextLevel.Value)
+                    .Select(a => a.Approver.Email!)
+                    .ToList();
+
+                if (approverEmails.Count > 0)
+                {
+                    await _emailNotifications.NotifyActionRequiredAsync(
+                        booking,
+                        approverEmails,
+                        "กรุณาอนุมัติใบงาน",
+                        relativeUrl: $"/Approval/Detail/{booking.BookingId}");
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to send vendor accept email for booking {BookingId}", booking.BookingId);
+            }
 
             TempData["Success"] = "You accepted the vendor quote. The request will go through approval process.";
             return RedirectToAction(nameof(Detail), new { id });

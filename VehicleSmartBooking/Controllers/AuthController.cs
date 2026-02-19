@@ -24,8 +24,13 @@ namespace VehicleSmartBooking.Controllers
         }
 
         [HttpGet("sso/login")]
-        public IActionResult SsoLogin()
+        public IActionResult SsoLogin(string? returnUrl = null)
         {
+            if (!string.IsNullOrWhiteSpace(returnUrl) && Url.IsLocalUrl(returnUrl))
+            {
+                HttpContext.Session.SetString("ReturnUrl", returnUrl);
+            }
+
             var baseUrl = _ssoOptions.BaseUrl?.TrimEnd('/') ?? "";
             var signInPath = _ssoOptions.SignInPath ?? "";
             var callback = _ssoOptions.CallbackUrl ?? "";
@@ -74,6 +79,8 @@ namespace VehicleSmartBooking.Controllers
             // Sign in using cookie authentication to keep ASP.NET authorization working.
             await HttpContext.SignInAsync(principal);
 
+            var returnUrl = HttpContext.Session.GetString("ReturnUrl");
+
             // Also persist selected claim information in server-side session (JSON) and avoid storing everything in cookie.
             try
             {
@@ -94,6 +101,12 @@ namespace VehicleSmartBooking.Controllers
             catch (Exception ex)
             {
                 _logger.LogWarning(ex, "Failed to write user info into session for UserCode={UserCode}", user.UserCode);
+            }
+
+            if (!string.IsNullOrWhiteSpace(returnUrl) && Url.IsLocalUrl(returnUrl))
+            {
+                HttpContext.Session.Remove("ReturnUrl");
+                return Redirect(returnUrl);
             }
 
             return RedirectAfterLogin(user);

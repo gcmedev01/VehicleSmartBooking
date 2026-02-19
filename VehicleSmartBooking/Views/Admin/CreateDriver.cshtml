@@ -48,6 +48,12 @@
                 <span class="text-danger small">@Html.ValidationMessageFor(m => m.DriverNameEN)</span>
             </div>
 
+            <div class="col-12 col-md-4">
+                <label class="form-label">เบอร์โทรศัพท์</label>
+                <input asp-for="Phone" class="form-control" placeholder="เช่น 0812345678" />
+                <span class="text-danger small">@Html.ValidationMessageFor(m => m.Phone)</span>
+            </div>
+
             <div class="col-12 col-md-6">
                 <label class="form-label">Vehicle</label>
                 <select asp-for="VehicleId" class="form-select" asp-items="vehicles">

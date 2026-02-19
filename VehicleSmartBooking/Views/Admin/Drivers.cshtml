@@ -45,6 +45,7 @@
                         <th>Name</th>
                         <th>Vehicle</th>
                         <th>Type</th>
+                        <th>Tel</th>
                         <th class="text-center">Active</th>
                         <th></th>
                     </tr>
@@ -54,11 +55,13 @@
                     {
                         var vehicleTypeText = d.Vehicle == null ? "" : VehicleText(d.Vehicle.VehicleType);
                         var dotColor = d.IsActive ? "#28a745" : "#adb5bd";
+                        var phoneText = string.IsNullOrWhiteSpace(d.Phone) ? "-" : d.Phone;
                         <tr>
                             <td>@d.User.UserCode</td>
                             <td>@(d.User.UsernameTH ?? d.User.UsernameEN ?? "-")</td>
                             <td>@(d.Vehicle?.PlateNo ?? "-")</td>
                             <td>@vehicleTypeText</td>
+                            <td>@phoneText</td>
                             <td class="text-center">
                                 <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:@dotColor;"></span>
                             </td>

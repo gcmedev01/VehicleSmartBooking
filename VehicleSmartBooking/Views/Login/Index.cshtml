@@ -18,7 +18,7 @@
                 <div class="text-muted2 mb-4">Choose how you want to sign in</div>
 
                 <!-- Choice 1: Microsoft -->
-                <a class="choice-card d-flex gap-3 align-items-center text-decoration-none text-dark mb-3" href="/auth/sso/login">
+                <a class="choice-card d-flex gap-3 align-items-center text-decoration-none text-dark mb-3" href="/auth/sso/login?returnUrl=@System.Net.WebUtility.UrlEncode(ViewData["ReturnUrl"]?.ToString())">
                     <div class="choice-icon choice-icon-ms">
                         <svg width="22" height="22" viewBox="0 0 23 23" aria-hidden="true">
                             <rect x="0" y="0" width="10" height="10" fill="#F25022" />
@@ -51,6 +51,7 @@
                 <div class="local-form" id="localForm">
                     <form asp-controller="Account" asp-action="Login" method="post" class="mt-3">
                         @Html.AntiForgeryToken()
+                        <input type="hidden" name="returnUrl" value="@(ViewData["ReturnUrl"] ?? "")" />
 
                         <div class="mb-3">
                             <label class="form-label small text-muted2">Username</label>

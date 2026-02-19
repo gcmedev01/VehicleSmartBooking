@@ -65,6 +65,11 @@ namespace VehicleSmartBooking.Migrations
                         .HasColumnType("bit")
                         .HasDefaultValue(false);
 
+                    b.Property<bool>("IsPersonal")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(false);
+
                     b.Property<string>("JobNo")
                         .HasMaxLength(50)
                         .HasColumnType("nvarchar(50)");
@@ -340,7 +345,19 @@ namespace VehicleSmartBooking.Migrations
                     b.Property<int>("DriverId")
                         .HasColumnType("int");
 
-                    b.Property<int>("Score")
+                    b.Property<int>("Score1")
+                        .HasColumnType("int");
+
+                    b.Property<int>("Score2")
+                        .HasColumnType("int");
+
+                    b.Property<int>("Score3")
+                        .HasColumnType("int");
+
+                    b.Property<int>("Score4")
+                        .HasColumnType("int");
+
+                    b.Property<int>("Score5")
                         .HasColumnType("int");
 
                     b.HasKey("RatingId");
@@ -353,7 +370,15 @@ namespace VehicleSmartBooking.Migrations
 
                     b.ToTable("DriverRatings", "dbo", t =>
                         {
-                            t.HasCheckConstraint("CK_Ratings_Score", "[Score] BETWEEN 1 AND 5");
+                            t.HasCheckConstraint("CK_Ratings_Score1", "[Score1] BETWEEN 1 AND 4");
+
+                            t.HasCheckConstraint("CK_Ratings_Score2", "[Score2] BETWEEN 1 AND 4");
+
+                            t.HasCheckConstraint("CK_Ratings_Score3", "[Score3] BETWEEN 1 AND 4");
+
+                            t.HasCheckConstraint("CK_Ratings_Score4", "[Score4] BETWEEN 1 AND 4");
+
+                            t.HasCheckConstraint("CK_Ratings_Score5", "[Score5] BETWEEN 1 AND 4");
                         });
                 });
 

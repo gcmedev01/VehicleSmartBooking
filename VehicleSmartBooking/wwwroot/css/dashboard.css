@@ -1,0 +1,20 @@
+.dashboard-filter-bar {
+    z-index: 1020;
+}
+
+.dashboard-widget .card-header {
+    background-color: #f8f9fa;
+}
+
+.dashboard-widget .card-body {
+    min-height: 220px;
+}
+
+.dashboard-widget.is-loading .card-header span:last-child {
+    opacity: 0.6;
+}
+
+.dashboard-chart {
+    position: relative;
+    min-height: 180px;
+}

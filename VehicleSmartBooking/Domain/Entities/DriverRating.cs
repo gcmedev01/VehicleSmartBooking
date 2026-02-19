@@ -7,7 +7,11 @@ public sealed class DriverRating
     public long BookingId { get; set; }
     public int DriverId { get; set; }
 
-    public int Score { get; set; }
+    public int Score1 { get; set; }
+    public int Score2 { get; set; }
+    public int Score3 { get; set; }
+    public int Score4 { get; set; }
+    public int Score5 { get; set; }
     public string? Comment { get; set; }
     public DateTime CreatedAtUtc { get; set; }
 

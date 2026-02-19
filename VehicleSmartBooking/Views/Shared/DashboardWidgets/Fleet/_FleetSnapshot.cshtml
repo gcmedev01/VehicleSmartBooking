@@ -1,0 +1,49 @@
+@model VehicleSmartBooking.Features.Dashboard.Widgets.Fleet.FleetSnapshotVm
+
+@{
+    var statusUrl = Url.Action("VehicleStatusData", "AdminDashboard") ?? string.Empty;
+}
+
+<div class="row g-3">
+    <div class="col-12">
+        <div class="fw-semibold mb-2">Fleet Status</div>
+        <div class="dashboard-chart">
+            <canvas class="js-fleet-status-chart" data-status-url="@statusUrl"></canvas>
+        </div>
+    </div>
+    <div class="col-12">
+        <div class="fw-semibold mb-2">Top Utilized Vehicles</div>
+        @if (Model.TopVehicles.Count == 0)
+        {
+            <div class="text-muted">No vehicle usage data.</div>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table table-sm align-middle mb-0">
+                    <thead>
+                        <tr class="text-muted">
+                            <th>Plate</th>
+                            <th>Type</th>
+                            <th class="text-end">Trips</th>
+                            <th class="text-end">Hours</th>
+                            <th class="text-end">Last Trip</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var vehicle in Model.TopVehicles)
+                        {
+                            <tr>
+                                <td>@vehicle.PlateNo</td>
+                                <td>@vehicle.VehicleType</td>
+                                <td class="text-end">@vehicle.TripsCount</td>
+                                <td class="text-end">@vehicle.TotalHours.ToString("N1")</td>
+                                <td class="text-end">@(vehicle.LastTripAtUtc?.ToLocalTime().ToString("dd/MM/yyyy") ?? "-")</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+</div>

@@ -30,6 +30,7 @@ public sealed class Booking
     public int? AssignedDriverId { get; set; }
 
     public bool IsExternalRental { get; set; }
+    public bool IsPersonal { get; set; }
     public DateTime? CancelledAtUtc { get; set; }
 
     public DateTime CreatedAtUtc { get; set; }

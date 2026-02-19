@@ -30,6 +30,12 @@
                 <input asp-for="DriverNameEN" class="form-control" />
             </div>
 
+            <div class="col-md-4">
+                <label class="form-label">‡∫Õ√Ï‚∑√»—æ∑Ï</label>
+                <input asp-for="Phone" class="form-control" />
+                <span class="text-danger small">@Html.ValidationMessageFor(m => m.Phone)</span>
+            </div>
+
             <div class="col-md-6">
                 <label class="form-label">Vehicle</label>
                 <select asp-for="VehicleId" asp-items="(IEnumerable<SelectListItem>)ViewBag.Vehicles" class="form-select">

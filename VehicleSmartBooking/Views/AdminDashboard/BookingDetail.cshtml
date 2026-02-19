@@ -1,0 +1,281 @@
+@model VehicleBooking.Web.Domain.Entities.Booking
+@using VehicleBooking.Web.Domain.Enums
+@using System.Net
+
+@{
+    Layout = "_VehicleBookingLayout";
+    ViewData["Title"] = $"Booking #{Model?.BookingId}";
+
+    if (Model == null)
+    {
+        return;
+    }
+
+    var returnUrl = ViewData["ReturnUrl"] as string;
+    if (string.IsNullOrWhiteSpace(returnUrl))
+    {
+        returnUrl = Context.Request.Query["returnUrl"].ToString();
+    }
+    if (!string.IsNullOrWhiteSpace(returnUrl))
+    {
+        returnUrl = WebUtility.UrlDecode(returnUrl);
+    }
+    if (string.IsNullOrWhiteSpace(returnUrl))
+    {
+        returnUrl = Url.Action("Index", "AdminDashboard") ?? "/AdminDashboard";
+    }
+
+    var requesterName = Model.Requester?.UsernameTH ?? Model.Requester?.UsernameEN ?? Model.RequesterUserId.ToString();
+    var driverName = Model.AssignedDriver?.User?.UsernameTH ?? Model.AssignedDriver?.User?.UsernameEN ?? Model.AssignedDriverId?.ToString() ?? "-";
+    var vehiclePlate = Model.AssignedVehicle?.PlateNo ?? Model.AssignedVehicleId?.ToString() ?? "-";
+}
+
+<div class="d-flex align-items-center justify-content-between mb-3">
+    <div>
+        <h1 class="h4 mb-1">Booking #@Model.BookingId</h1>
+        <div class="text-muted">@requesterName</div>
+    </div>
+    <a class="btn btn-outline-secondary" href="@returnUrl">Back to Dashboard</a>
+</div>
+
+<ul class="nav nav-tabs" id="bookingDetailTabs" role="tablist">
+    <li class="nav-item" role="presentation">
+        <button class="nav-link active" id="summary-tab" data-bs-toggle="tab" data-bs-target="#summary" type="button" role="tab">Summary</button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="approvals-tab" data-bs-toggle="tab" data-bs-target="#approvals" type="button" role="tab">Approvals</button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="dispatch-tab" data-bs-toggle="tab" data-bs-target="#dispatch" type="button" role="tab">Dispatch</button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="external-tab" data-bs-toggle="tab" data-bs-target="#external" type="button" role="tab">External Rental</button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="personal-tab" data-bs-toggle="tab" data-bs-target="#personal" type="button" role="tab">Personal Reimbursement</button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="attachments-tab" data-bs-toggle="tab" data-bs-target="#attachments" type="button" role="tab">Attachments</button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="rating-tab" data-bs-toggle="tab" data-bs-target="#rating" type="button" role="tab">Rating</button>
+    </li>
+</ul>
+
+<div class="tab-content border border-top-0 p-3 bg-white" id="bookingDetailTabContent">
+    <div class="tab-pane fade show active" id="summary" role="tabpanel">
+        <div class="row g-3">
+            <div class="col-12 col-lg-6">
+                <div class="card h-100">
+                    <div class="card-body">
+                        <h6 class="card-title">Booking Summary</h6>
+                        <div class="row g-2">
+                            <div class="col-6">
+                                <div class="text-muted small">Status</div>
+                                <div>@Model.Status</div>
+                            </div>
+                            <div class="col-6">
+                                <div class="text-muted small">Trip Type</div>
+                                <div>@Model.TripType</div>
+                            </div>
+                            <div class="col-6">
+                                <div class="text-muted small">Vehicle Type</div>
+                                <div>@Model.VehicleTypeRequested</div>
+                            </div>
+                            <div class="col-6">
+                                <div class="text-muted small">Requester</div>
+                                <div>@requesterName</div>
+                            </div>
+                            <div class="col-6">
+                                <div class="text-muted small">Driver</div>
+                                <div>@driverName</div>
+                            </div>
+                            <div class="col-6">
+                                <div class="text-muted small">Vehicle</div>
+                                <div>@vehiclePlate</div>
+                            </div>
+                            <div class="col-12">
+                                <div class="text-muted small">Route</div>
+                                <div>@Model.PickupLocation ? @Model.DestinationLocation</div>
+                            </div>
+                            <div class="col-6">
+                                <div class="text-muted small">Start</div>
+                                <div>@Model.StartAtUtc.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</div>
+                            </div>
+                            <div class="col-6">
+                                <div class="text-muted small">End</div>
+                                <div>@Model.EndAtUtc.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-12 col-lg-6">
+                <div class="card h-100">
+                    <div class="card-body">
+                        <h6 class="card-title">Notes</h6>
+                        <div class="text-muted small">Purpose</div>
+                        <div class="mb-2">@(string.IsNullOrWhiteSpace(Model.Purpose) ? "-" : Model.Purpose)</div>
+                        <div class="text-muted small">Detail</div>
+                        <div>@(string.IsNullOrWhiteSpace(Model.DetailNote) ? "-" : Model.DetailNote)</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="tab-pane fade" id="approvals" role="tabpanel">
+        @if (Model.Approvals?.Any() != true)
+        {
+            <div class="text-muted">No approvals.</div>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table table-sm align-middle">
+                    <thead>
+                        <tr class="text-muted">
+                            <th>Level</th>
+                            <th>Approver</th>
+                            <th>Status</th>
+                            <th class="text-end">Action Time</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var approval in Model.Approvals.OrderBy(x => x.LevelNo))
+                        {
+                            var approverName = approval.Approver?.UsernameTH ?? approval.Approver?.UsernameEN ?? approval.ApproverUserId.ToString();
+                            <tr>
+                                <td>@approval.LevelNo</td>
+                                <td>@approverName</td>
+                                <td>@approval.Status</td>
+                                <td class="text-end">@(approval.ActionAtUtc?.ToLocalTime().ToString("dd/MM/yyyy HH:mm") ?? "-")</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+    <div class="tab-pane fade" id="dispatch" role="tabpanel">
+        @if (Model.DispatchLogs?.Any() != true)
+        {
+            <div class="text-muted">No dispatch logs.</div>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table table-sm align-middle">
+                    <thead>
+                        <tr class="text-muted">
+                            <th>Attempt</th>
+                            <th>Driver</th>
+                            <th>Vehicle</th>
+                            <th>Action</th>
+                            <th class="text-end">Dispatched</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var log in Model.DispatchLogs.OrderByDescending(x => x.DispatchedAtUtc))
+                        {
+                            var logDriver = log.Driver?.User?.UsernameTH ?? log.Driver?.User?.UsernameEN ?? log.DriverId.ToString();
+                            var logVehicle = log.Vehicle?.PlateNo ?? log.VehicleId.ToString();
+                            <tr>
+                                <td>@log.AttemptNo</td>
+                                <td>@logDriver</td>
+                                <td>@logVehicle</td>
+                                <td>@(log.DriverAction?.ToString() ?? "Dispatched")</td>
+                                <td class="text-end">@log.DispatchedAtUtc.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+    <div class="tab-pane fade" id="external" role="tabpanel">
+        @if (Model.ExternalRental == null)
+        {
+            <div class="text-muted">No external rental.</div>
+        }
+        else
+        {
+            <div class="row g-3">
+                <div class="col-12 col-lg-6">
+                    <div class="card">
+                        <div class="card-body">
+                            <div class="text-muted small">Vendor</div>
+                            <div class="mb-2">@Model.ExternalRental.VendorName</div>
+                            <div class="text-muted small">Quoted Price</div>
+                            <div class="mb-2">@(Model.ExternalRental.QuotedPrice?.ToString("N2") ?? "-")</div>
+                            <div class="text-muted small">Decision</div>
+                            <div>@Model.ExternalRental.UserDecision</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-12 col-lg-6">
+                    <div class="card">
+                        <div class="card-body">
+                            <div class="text-muted small">Rental Plate</div>
+                            <div class="mb-2">@(Model.ExternalRental.RentalPlateNo ?? "-")</div>
+                            <div class="text-muted small">Driver</div>
+                            <div class="mb-2">@(Model.ExternalRental.RentalDriverName ?? "-")</div>
+                            <div class="text-muted small">Phone</div>
+                            <div>@(Model.ExternalRental.RentalDriverPhone ?? "-")</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+    <div class="tab-pane fade" id="personal" role="tabpanel">
+        <div class="text-muted">Personal reimbursement data is not available in this project.</div>
+    </div>
+    <div class="tab-pane fade" id="attachments" role="tabpanel">
+        @if (Model.Attachments?.Any() != true)
+        {
+            <div class="text-muted">No attachments.</div>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table table-sm align-middle">
+                    <thead>
+                        <tr class="text-muted">
+                            <th>File</th>
+                            <th>Content Type</th>
+                            <th class="text-end">Uploaded</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var attachment in Model.Attachments.OrderByDescending(x => x.UploadedAtUtc))
+                        {
+                            <tr>
+                                <td><a href="@attachment.StoragePath" target="_blank">@attachment.FileName</a></td>
+                                <td>@attachment.ContentType</td>
+                                <td class="text-end">@attachment.UploadedAtUtc.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+    <div class="tab-pane fade" id="rating" role="tabpanel">
+        @if (Model.Rating == null)
+        {
+            <div class="text-muted">No rating.</div>
+        }
+        else
+        {
+            var avg = (Model.Rating.Score1 + Model.Rating.Score2 + Model.Rating.Score3 + Model.Rating.Score4 + Model.Rating.Score5) / 5.0;
+            <div class="card">
+                <div class="card-body">
+                    <div class="text-muted small">Average Score</div>
+                    <div class="fs-4 fw-semibold">@avg.ToString("0.0")</div>
+                    <div class="text-muted small">Comment</div>
+                    <div>@(string.IsNullOrWhiteSpace(Model.Rating.Comment) ? "-" : Model.Rating.Comment)</div>
+                </div>
+            </div>
+        }
+    </div>
+</div>

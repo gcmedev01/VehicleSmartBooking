@@ -20,6 +20,7 @@
         else if (controller == "approvals" && action == "detail") active = "Approve";
 
         // Admin
+        else if (controller == "admindashboard") active = "AdminDashboard";
         else if (controller == "admin" && action == "worklist") active = "AdminWorklist";
         else if (controller == "admin" && (action == "allbookings" || action == "detail")) active = "AllTasks";
         else if (controller == "admin" && action == "booking") active = "AdminWorklist";
@@ -206,6 +207,13 @@
                         <div class="vb-nav-section">
                             <div class="vb-nav-label">ADMIN</div>
 
+                            <a asp-controller="AdminDashboard" asp-action="Index"
+                               class="vb-nav-item @(active == "AdminDashboard" ? "is-active" : "")"
+                               aria-current="@(active == "AdminDashboard" ? "page" : "")">
+                                <span class="vb-nav-icon"><i class="bi bi-speedometer2"></i></span>
+                                Dashboard
+                            </a>
+
                             <a asp-controller="Admin" asp-action="Worklist"
                                class="vb-nav-item @(active == "AdminWorklist" ? "is-active" : "")"
                                aria-current="@(active == "AdminWorklist" ? "page" : "")">
@@ -293,6 +301,7 @@
     </div>
     <script src="~/lib/jquery/dist/jquery.min.js"></script>
     <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
     @await RenderSectionAsync("Scripts", required: false)
 </body>
 </html>

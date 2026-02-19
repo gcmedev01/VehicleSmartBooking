@@ -1,0 +1,28 @@
+@{
+    var usageUrl = Url.Action("UsageMixData", "AdminDashboard") ?? string.Empty;
+    var tripUrl = Url.Action("TripScopeData", "AdminDashboard") ?? string.Empty;
+}
+
+<div class="row g-3">
+    <div class="col-12 col-lg-6">
+        <div class="fw-semibold mb-2">Usage Mix</div>
+        <div class="dashboard-chart">
+            <canvas class="js-usage-mix-chart" data-usage-url="@usageUrl"></canvas>
+        </div>
+        <div class="d-flex flex-wrap gap-3 small text-muted mt-2">
+            <span class="d-flex align-items-center gap-2"><span class="badge bg-primary">&nbsp;</span>Fleet</span>
+            <span class="d-flex align-items-center gap-2"><span class="badge bg-success">&nbsp;</span>Vendor</span>
+            <span class="d-flex align-items-center gap-2"><span class="badge bg-warning text-dark">&nbsp;</span>Personal</span>
+        </div>
+    </div>
+    <div class="col-12 col-lg-6">
+        <div class="fw-semibold mb-2">Trip Scope</div>
+        <div class="dashboard-chart">
+            <canvas class="js-trip-scope-chart" data-trip-url="@tripUrl"></canvas>
+        </div>
+        <div class="d-flex flex-wrap gap-3 small text-muted mt-2">
+            <span class="d-flex align-items-center gap-2"><span class="badge bg-info">&nbsp;</span>In Province</span>
+            <span class="d-flex align-items-center gap-2"><span class="badge bg-secondary">&nbsp;</span>Out Province</span>
+        </div>
+    </div>
+</div>

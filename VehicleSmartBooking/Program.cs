@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using VehicleBooking.Web.Data;
 using VehicleBooking.Web.Domain.Options;
 using VehicleBooking.Web.Domain.Services;
+using VehicleSmartBooking.Features.Dashboard.Queries;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -28,7 +29,7 @@ builder.Services
     .AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
     .AddCookie(options =>
     {
-        options.LoginPath = "/auth/driver/login"; // default ถ้ายังไม่ login
+        options.LoginPath = "/account/login"; // default ถ้ายังไม่ login
         options.AccessDeniedPath = "/home/notpermission";
         options.ExpireTimeSpan = TimeSpan.FromHours(8);
         options.SlidingExpiration = true;
@@ -39,9 +40,16 @@ builder.Services
         options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest; // dev ok
     });
 
-
 builder.Services.Configure<SsoOptions>(
     builder.Configuration.GetSection("Sso")
+);
+
+builder.Services.Configure<SmtpSettings>(
+    builder.Configuration.GetSection("SmtpSettings")
+);
+
+builder.Services.Configure<EmailNotificationOptions>(
+    builder.Configuration.GetSection("EmailNotification")
 );
 
 // removed ISsoClient registration
@@ -49,6 +57,8 @@ builder.Services.AddAuthorization();
 builder.Services.AddScoped<IPasswordHasher, Pbkdf2PasswordHasher>();
 builder.Services.AddScoped<ICurrentUserService, CurrentUserService>();
 builder.Services.AddScoped<IDriverWorkflowService, DriverWorkflowService>();
+builder.Services.AddScoped<IEmailNotificationService, EmailNotificationService>();
+builder.Services.AddScoped<IDashboardQueryService, DashboardQueryService>();
 
 // IHttpContextAccessor needed for CurrentUserService to read session
 builder.Services.AddHttpContextAccessor();

@@ -1,0 +1,30 @@
+@model VehicleSmartBooking.Features.Dashboard.Widgets.UsageMixWidgetViewModel
+@using System.Text.Json
+
+@{
+    var modeLabels = new[] { "Fleet", "Vendor", "Personal" };
+    var modeValues = new[] { Model.FleetCount, Model.VendorCount, Model.PersonalCount };
+    var tripLabels = new[] { "In Province", "Out Province" };
+    var tripValues = new[] { Model.InProvinceCount, Model.OutProvinceCount };
+}
+
+<div class="row g-3">
+    <div class="col-12 col-lg-6">
+        <div class="fw-semibold mb-2">Usage Mix</div>
+        <div class="dashboard-chart">
+            <canvas class="js-usage-mix-chart"
+                    data-chart-labels='@JsonSerializer.Serialize(modeLabels)'
+                    data-chart-values='@JsonSerializer.Serialize(modeValues)'></canvas>
+        </div>
+        <div class="mt-3 text-muted small">Fleet: @Model.FleetCount | Vendor: @Model.VendorCount | Personal: @Model.PersonalCount</div>
+    </div>
+    <div class="col-12 col-lg-6">
+        <div class="fw-semibold mb-2">Trip Scope</div>
+        <div class="dashboard-chart">
+            <canvas class="js-usage-mix-chart"
+                    data-chart-labels='@JsonSerializer.Serialize(tripLabels)'
+                    data-chart-values='@JsonSerializer.Serialize(tripValues)'></canvas>
+        </div>
+        <div class="mt-3 text-muted small">In: @Model.InProvinceCount | Out: @Model.OutProvinceCount</div>
+    </div>
+</div>

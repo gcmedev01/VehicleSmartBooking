@@ -1,0 +1,155 @@
+@model VehicleSmartBooking.Features.Dashboard.DashboardIndexViewModel
+@using Microsoft.AspNetCore.Mvc.Rendering
+@using VehicleBooking.Web.Domain.Enums
+@using System.Linq
+
+@{
+    Layout = "_VehicleBookingLayout";
+    ViewData["Title"] = "Admin Dashboard";
+
+    string TripText(TripType t) => t switch
+    {
+        TripType.InProvince => "ในจังหวัด",
+        TripType.OutProvince => "นอกจังหวัด",
+        _ => t.ToString()
+    };
+
+    string VehicleText(VehicleType v) => v switch
+    {
+        VehicleType.Pickup => "รถกระบะ",
+        VehicleType.Van => "รถตู้",
+        VehicleType.Sedan => "รถเก๋ง",
+        _ => v.ToString()
+    };
+
+    string StatusText(BookingStatus st) => st switch
+    {
+        BookingStatus.Draft => "ร่าง",
+        BookingStatus.Submitted => "ส่งคำขอแล้ว",
+        BookingStatus.WaitingApproval => "รออนุมัติ",
+        BookingStatus.WaitingDriverAccept => "รอพนักงานขับรถตอบรับ",
+        BookingStatus.DriverAccepted => "พนักงานขับรถตอบรับ",
+        BookingStatus.WaitingAdminVendorQuotation => "รอเสนอราคาผู้ให้บริการ",
+        BookingStatus.WaitingUserVendorAccept => "รอผู้ขอใช้ยอมรับผู้ให้บริการ",
+        BookingStatus.WaitingAdminVendorConfirm => "รอยืนยันผู้ให้บริการ",
+        BookingStatus.VendorRejectedByUser => "ผู้ขอใช้ปฏิเสธผู้ให้บริการ",
+        BookingStatus.WaitingAdminPersonal => "รอผู้ดูแลอนุมัติรถส่วนตัว",
+        BookingStatus.Completed => "เสร็จสิ้น",
+        BookingStatus.Rated => "ให้คะแนนแล้ว",
+        BookingStatus.Rejected => "ถูกปฏิเสธ",
+        BookingStatus.Cancelled => "ยกเลิก",
+        BookingStatus.AdminActionRequired => "รอผู้ดูแลดำเนินการ",
+        _ => st.ToString()
+    };
+
+    var tripOptions = Enum.GetValues<TripType>()
+        .Select(t => new SelectListItem
+        {
+            Value = ((int)t).ToString(),
+            Text = TripText(t),
+            Selected = Model.Filters.TripScope == t
+        })
+        .ToList();
+
+    var vehicleOptions = Enum.GetValues<VehicleType>()
+        .Select(v => new SelectListItem
+        {
+            Value = ((int)v).ToString(),
+            Text = VehicleText(v),
+            Selected = Model.Filters.VehicleTypeRequested == v
+        })
+        .ToList();
+
+    var statusOptions = Enum.GetValues<BookingStatus>()
+        .Select(s => new SelectListItem
+        {
+            Value = ((int)s).ToString(),
+            Text = StatusText(s),
+            Selected = Model.Filters.Status == s
+        })
+        .ToList();
+}
+
+@section Styles {
+    <link rel="stylesheet" href="~/css/dashboard.css" asp-append-version="true" />
+}
+
+<div class="dashboard-filter-bar bg-white border-bottom mb-3">
+    <div class="container-fluid py-3">
+        <form method="get" class="row g-2 align-items-end">
+            <div class="col-6 col-lg-2">
+                <label class="form-label">Date From</label>
+                <input type="date" class="form-control" asp-for="Filters.DateFrom" />
+            </div>
+            <div class="col-6 col-lg-2">
+                <label class="form-label">Date To</label>
+                <input type="date" class="form-control" asp-for="Filters.DateTo" />
+            </div>
+            <div class="col-6 col-lg-2">
+                <label class="form-label">Division</label>
+                <select class="form-select" asp-for="Filters.Div" asp-items="@(new SelectList(Model.FilterOptions.DivOptions))">
+                    <option value="">ทั้งหมด</option>
+                </select>
+            </div>
+            <div class="col-6 col-lg-2">
+                <label class="form-label">Department</label>
+                <select class="form-select" asp-for="Filters.Dept" asp-items="@(new SelectList(Model.FilterOptions.DeptOptions))">
+                    <option value="">ทั้งหมด</option>
+                </select>
+            </div>
+            <div class="col-6 col-lg-2">
+                <label class="form-label">Function</label>
+                <select class="form-select" asp-for="Filters.Function" asp-items="@(new SelectList(Model.FilterOptions.FunctionOptions))">
+                    <option value="">ทั้งหมด</option>
+                </select>
+            </div>
+            <div class="col-6 col-lg-2">
+                <label class="form-label">Mode</label>
+                <select class="form-select" asp-for="Filters.Mode">
+                    <option value="">ทั้งหมด</option>
+                    <option value="fleet">รถภายในบริษัท</option>
+                    <option value="vendor">รถภายนอกบริษัท</option>
+                    <option value="personal">รถส่วนตัว</option>
+                </select>
+            </div>
+            <div class="col-6 col-lg-2">
+                <label class="form-label">Trip Scope</label>
+                <select class="form-select" asp-for="Filters.TripScope" asp-items="tripOptions">
+                    <option value="">ทั้งหมด</option>
+                </select>
+            </div>
+            <div class="col-6 col-lg-2">
+                <label class="form-label">Vehicle Type</label>
+                <select class="form-select" asp-for="Filters.VehicleTypeRequested" asp-items="vehicleOptions">
+                    <option value="">ทั้งหมด</option>
+                </select>
+            </div>
+            <div class="col-6 col-lg-2">
+                <label class="form-label">Status</label>
+                <select class="form-select" asp-for="Filters.Status" asp-items="statusOptions">
+                    <option value="">ทั้งหมด</option>
+                </select>
+            </div>
+            <div class="col-12 col-lg-2">
+                <button type="submit" class="btn btn-primary w-100">Apply Filters</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="container-fluid">
+    <div class="row g-3" data-dashboard-widgets>
+        @foreach (var widget in Model.Widgets)
+        {
+            @await Html.PartialAsync("DashboardWidgets/_WidgetShell", widget)
+        }
+    </div>
+</div>
+
+@section Scripts {
+    <script src="~/js/dashboard/usage-mix.js" asp-append-version="true"></script>
+    <script src="~/js/dashboard/cost-vendor.js" asp-append-version="true"></script>
+    <script src="~/js/dashboard/fleet.js" asp-append-version="true"></script>
+    <script src="~/js/dashboard/driver-quality.js" asp-append-version="true"></script>
+    <script src="~/js/dashboard/dashboard-loader.js" asp-append-version="true"></script>
+}

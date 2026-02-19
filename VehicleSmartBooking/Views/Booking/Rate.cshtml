@@ -1,0 +1,161 @@
+@model VehicleSmartBooking.Models.BookingRatingViewModel
+@using VehicleBooking.Web.Domain.Enums
+
+@{
+    Layout = "_VehicleBookingLayout";
+    var booking = Model.Booking;
+    if (booking == null)
+    {
+        return;
+    }
+
+    ViewData["Title"] = $"ให้คะแนน Booking #{booking.BookingId}";
+
+    string VehicleText(VehicleType v) => v switch
+    {
+        VehicleType.Pickup => "รถกระบะ",
+        VehicleType.Van => "รถตู้",
+        VehicleType.Sedan => "รถเก๋ง",
+        _ => v.ToString()
+    };
+
+    string TripText(TripType t) => t switch
+    {
+        TripType.InProvince => "ในจังหวัด",
+        TripType.OutProvince => "นอกจังหวัด",
+        _ => t.ToString()
+    };
+
+    var driverName = booking.AssignedDriver?.User?.UsernameTH
+        ?? booking.AssignedDriver?.User?.UsernameEN
+        ?? booking.AssignedDriverId?.ToString()
+        ?? "-";
+
+    var driverPhone = booking.AssignedDriver?.Phone ?? "-";
+    var vehicleText = booking.AssignedVehicle?.PlateNo ?? "-";
+}
+
+<div class="vb-page-head vb-page-hero mb-4">
+    <div class="vb-page-title">
+        <div class="vb-page-icon">?</div>
+        <div>
+            <h1 class="vb-page-h1">ให้คะแนนการใช้บริการ</h1>
+            <div class="vb-page-sub">Booking #@booking.BookingId</div>
+        </div>
+    </div>
+
+    <div class="vb-page-meta d-none d-md-flex">
+        <span class="vb-meta-pill">My Task</span>
+        <span class="vb-meta-pill">Rate</span>
+    </div>
+</div>
+
+<div class="row g-3">
+    <div class="col-12 col-md-4">
+        <div class="vb-card p-3 p-md-4 mb-3">
+            <div class="fw-semibold mb-3">ข้อมูลการจอง</div>
+
+            <div class="vb-approver-row mb-2">
+                <div class="vb-approver-label">ประเภทการเดินทาง</div>
+                <div class="vb-approver-value">@TripText(booking.TripType)</div>
+            </div>
+
+            <div class="vb-approver-row mb-2">
+                <div class="vb-approver-label">ประเภทรถ</div>
+                <div class="vb-approver-value">@VehicleText(booking.VehicleTypeRequested)</div>
+            </div>
+
+            <div class="vb-approver-row mb-2">
+                <div class="vb-approver-label">ทะเบียนรถ</div>
+                <div class="vb-approver-value">@vehicleText</div>
+            </div>
+
+            <div class="vb-approver-row">
+                <div class="vb-approver-label">พนักงานขับรถ</div>
+                <div class="vb-approver-value">@driverName</div>
+            </div>
+
+            <div class="vb-approver-row mt-2">
+                <div class="vb-approver-label">เบอร์โทร</div>
+                <div class="vb-approver-value">@driverPhone</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-12 col-md-8">
+        <div class="vb-card p-3 p-md-4">
+            <div class="fw-semibold mb-3">เกณฑ์การให้คะแนนการให้บริการ : ดีมาก = 4 คะแนน, ดี = 3 คะแนน, พอใช้ = 2 คะแนน และปรับปรุง = 1 คะแนน</div>
+
+            <form asp-action="Rate" asp-route-id="@booking.BookingId" method="post">
+                @Html.AntiForgeryToken()
+
+                <div class="table-responsive">
+                    <table class="table align-middle">
+                        <thead>
+                            <tr class="text-center">
+                                <th class="text-start">หัวข้อ</th>
+                                <th>ดีมาก (4)</th>
+                                <th>ดี (3)</th>
+                                <th>พอใช้ (2)</th>
+                                <th>ปรับปรุง (1)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>1.พนักงานขับรถ มีความสุภาพเรียบร้อย</td>
+                                <td class="text-center"><input class="form-check-input" type="radio" asp-for="Score1" value="4" /></td>
+                                <td class="text-center"><input class="form-check-input" type="radio" asp-for="Score1" value="3" /></td>
+                                <td class="text-center"><input class="form-check-input" type="radio" asp-for="Score1" value="2" /></td>
+                                <td class="text-center"><input class="form-check-input" type="radio" asp-for="Score1" value="1" /></td>
+                            </tr>
+                            <tr>
+                                <td>2.พนักงานขับรถ มีความตรงต่อเวลา</td>
+                                <td class="text-center"><input class="form-check-input" type="radio" asp-for="Score2" value="4" /></td>
+                                <td class="text-center"><input class="form-check-input" type="radio" asp-for="Score2" value="3" /></td>
+                                <td class="text-center"><input class="form-check-input" type="radio" asp-for="Score2" value="2" /></td>
+                                <td class="text-center"><input class="form-check-input" type="radio" asp-for="Score2" value="1" /></td>
+                            </tr>
+                            <tr>
+                                <td>3.พนักงานขับรถ แต่งกายสุภาพ ไม่สวมรองเท้าแตะ</td>
+                                <td class="text-center"><input class="form-check-input" type="radio" asp-for="Score3" value="4" /></td>
+                                <td class="text-center"><input class="form-check-input" type="radio" asp-for="Score3" value="3" /></td>
+                                <td class="text-center"><input class="form-check-input" type="radio" asp-for="Score3" value="2" /></td>
+                                <td class="text-center"><input class="form-check-input" type="radio" asp-for="Score3" value="1" /></td>
+                            </tr>
+                            <tr>
+                                <td>4.พนักงานขับรถ รักษาความสะอาดรถยนต์อย่างสม่ำเสมอ</td>
+                                <td class="text-center"><input class="form-check-input" type="radio" asp-for="Score4" value="4" /></td>
+                                <td class="text-center"><input class="form-check-input" type="radio" asp-for="Score4" value="3" /></td>
+                                <td class="text-center"><input class="form-check-input" type="radio" asp-for="Score4" value="2" /></td>
+                                <td class="text-center"><input class="form-check-input" type="radio" asp-for="Score4" value="1" /></td>
+                            </tr>
+                            <tr>
+                                <td>5.การเดินทางในครั้งนี้ ผู้ใช้บริการได้รับความปลอดภัย ไม่มีเหตุการณ์เสี่ยงการเกิดอุบัติเหตุ</td>
+                                <td class="text-center"><input class="form-check-input" type="radio" asp-for="Score5" value="4" /></td>
+                                <td class="text-center"><input class="form-check-input" type="radio" asp-for="Score5" value="3" /></td>
+                                <td class="text-center"><input class="form-check-input" type="radio" asp-for="Score5" value="2" /></td>
+                                <td class="text-center"><input class="form-check-input" type="radio" asp-for="Score5" value="1" /></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="text-danger" asp-validation-summary="ModelOnly"></div>
+
+                <div class="mb-3">
+                    <label class="form-label">ความคิดเห็น (ถ้ามี)</label>
+                    <textarea class="form-control" asp-for="Comment" rows="3"></textarea>
+                </div>
+
+                <div class="d-flex justify-content-end gap-2">
+                    <a asp-action="Detail" asp-route-id="@booking.BookingId" class="btn btn-light">กลับ</a>
+                    <button type="submit" class="btn btn-success">ส่งคะแนน</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}
