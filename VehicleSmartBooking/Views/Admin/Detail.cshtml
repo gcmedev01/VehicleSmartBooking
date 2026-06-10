@@ -1,6 +1,7 @@
 ﻿@model VehicleBooking.Web.Domain.Entities.Booking
 @using VehicleBooking.Web.Domain.Enums
 @using System.Globalization
+@using Microsoft.AspNetCore.Mvc.Rendering
 @{
     string PhotoGroupLabel(DriverCompletionPhotoGroup g) => g switch
     {
@@ -135,6 +136,21 @@
             <span class="vb-meta-pill">Booking #@Model.BookingId</span>
         </div>
     </div>
+
+    @if (TempData["Success"] is string adminSuccessMsg && !string.IsNullOrWhiteSpace(adminSuccessMsg))
+    {
+        <div class="alert alert-success alert-dismissible mb-3" role="alert">
+            @adminSuccessMsg
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    }
+    @if (TempData["Error"] is string adminErrorMsg && !string.IsNullOrWhiteSpace(adminErrorMsg))
+    {
+        <div class="alert alert-danger alert-dismissible mb-3" role="alert">
+            @adminErrorMsg
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    }
 
     <div class="row g-3">
         <!-- ===== Left column ===== -->
@@ -432,6 +448,60 @@
             </div>
         </div>
     </div>
+
+    @{
+        bool showReassign = ViewBag.ShowReassign is bool sr && sr;
+        var availableDrivers = (ViewBag.AvailableDrivers as IEnumerable<SelectListItem>)
+                               ?? Enumerable.Empty<SelectListItem>();
+    }
+    @if (showReassign)
+    {
+        <div class="vb-card p-3 p-md-4 mb-3">
+            <div class="fw-semibold mb-2">เปลี่ยน พขร./รถ</div>
+            <div class="text-muted small mb-3">ระบบจะแสดงเฉพาะ พขร./รถ ที่ว่างในช่วงวันและเวลาที่จอง</div>
+
+            <div class="vb-approver-row mb-2">
+                <div class="vb-approver-label">พขร./รถ ปัจจุบัน</div>
+                <div class="vb-approver-value">@driverText / @vehicleText</div>
+            </div>
+            <div class="vb-approver-row mb-3">
+                <div class="vb-approver-label">ช่วงเวลา</div>
+                <div class="vb-approver-value">
+                    @Model.StartAtUtc.ToLocalTime().ToString("dd/MM/yyyy HH:mm") – @Model.EndAtUtc.ToLocalTime().ToString("dd/MM/yyyy HH:mm")
+                </div>
+            </div>
+
+            @if (!availableDrivers.Any())
+            {
+                <div class="text-muted small">ไม่มี พขร./รถ ว่างในช่วงเวลาที่จอง</div>
+            }
+            else
+            {
+                <form asp-action="ReassignDriver" asp-route-id="@Model.BookingId" method="post">
+                    @Html.AntiForgeryToken()
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">เลือก พขร./รถ</label>
+                        <select name="driverId" class="form-select">
+                            @foreach (var opt in availableDrivers)
+                            {
+                                if (opt.Selected)
+                                {
+                                    <option value="@opt.Value" selected>@opt.Text</option>
+                                }
+                                else
+                                {
+                                    <option value="@opt.Value">@opt.Text</option>
+                                }
+                            }
+                        </select>
+                    </div>
+                    <div class="d-flex justify-content-end">
+                        <button type="submit" class="btn btn-ci">บันทึกการเปลี่ยน พขร./รถ</button>
+                    </div>
+                </form>
+            }
+        </div>
+    }
 
     @if (Model.CompletionPhotos?.Any() == true)
     {

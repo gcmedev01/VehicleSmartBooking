@@ -1439,7 +1439,148 @@ namespace VehicleSmartBooking.Controllers
             // mark layout active nav for Detail -> MyTask
             ViewData["ActiveNav"] = "AllTasks";
 
+            // Load available driver/vehicle pairs for reassignment card
+            var terminal = BookingStatusHelper.TerminalStatuses;
+            bool showReassign = !booking.IsExternalRental
+                                && !booking.IsPersonal
+                                && !terminal.Contains(booking.Status)
+                                && booking.VehicleTypeRequested != VehicleType.Electric;
+
+            if (showReassign)
+            {
+                var startUtc     = booking.StartAtUtc;
+                var endUtc       = booking.EndAtUtc;
+                var reqType      = booking.VehicleTypeRequested;
+                bool needOutProv = booking.TripType == TripType.OutProvince;
+
+                var candidateData = await (
+                    from d in _db.Drivers.AsNoTracking()
+                    join v in _db.Vehicles.AsNoTracking() on d.VehicleId equals v.VehicleId
+                    join u in _db.Users.AsNoTracking()    on d.UserId  equals u.UserId
+                    where d.IsActive
+                          && (!needOutProv || d.CanDriveOutOfProvince)
+                          && v.IsActive
+                          && v.VehicleType == reqType
+                    select new
+                    {
+                        d.DriverId,
+                        d.VehicleId,
+                        DriverName = u.UsernameTH ?? u.UsernameEN,
+                        v.PlateNo,
+                        v.VehicleType
+                    }
+                ).ToListAsync();
+
+                if (candidateData.Count > 0)
+                {
+                    var driverIds  = candidateData.Select(c => c.DriverId).ToList();
+                    var vehicleIds = candidateData.Select(c => c.VehicleId).ToList();
+
+                    var busyAssignments = await _db.Bookings.AsNoTracking()
+                        .Where(b =>
+                            b.BookingId != booking.BookingId &&
+                            !terminal.Contains(b.Status) &&
+                            b.StartAtUtc < endUtc &&
+                            startUtc < b.EndAtUtc &&
+                            ((b.AssignedVehicleId != null && vehicleIds.Contains(b.AssignedVehicleId.Value)) ||
+                             (b.AssignedDriverId  != null && driverIds.Contains(b.AssignedDriverId.Value))))
+                        .Select(b => new { b.AssignedVehicleId, b.AssignedDriverId })
+                        .ToListAsync();
+
+                    var busyVehicleSet = new HashSet<int>(busyAssignments
+                        .Where(x => x.AssignedVehicleId.HasValue)
+                        .Select(x => x.AssignedVehicleId!.Value));
+                    var busyDriverSet = new HashSet<int>(busyAssignments
+                        .Where(x => x.AssignedDriverId.HasValue)
+                        .Select(x => x.AssignedDriverId!.Value));
+
+                    ViewBag.AvailableDrivers = candidateData
+                        .Where(c => !busyVehicleSet.Contains(c.VehicleId) && !busyDriverSet.Contains(c.DriverId))
+                        .Select(c =>
+                        {
+                            var vt = c.VehicleType switch
+                            {
+                                VehicleType.Pickup => "รถกระบะ",
+                                VehicleType.Van    => "รถตู้",
+                                VehicleType.Sedan  => "รถเก๋ง",
+                                _                  => c.VehicleType.ToString()
+                            };
+                            return new SelectListItem(
+                                $"{c.DriverName ?? $"#{c.DriverId}"} — {c.PlateNo} ({vt})",
+                                c.DriverId.ToString(),
+                                c.DriverId == booking.AssignedDriverId);
+                        })
+                        .ToList();
+                }
+                else
+                {
+                    ViewBag.AvailableDrivers = new List<SelectListItem>();
+                }
+            }
+
+            ViewBag.ShowReassign = showReassign;
+
             return View(booking);
+        }
+
+        // POST: /Admin/ReassignDriver/{id}
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> ReassignDriver(long id, int driverId)
+        {
+            var booking = await _db.Bookings.SingleOrDefaultAsync(b => b.BookingId == id);
+            if (booking is null) return NotFound();
+
+            var terminal = BookingStatusHelper.TerminalStatuses;
+            if (booking.IsExternalRental || booking.IsPersonal
+                || terminal.Contains(booking.Status)
+                || booking.VehicleTypeRequested == VehicleType.Electric)
+            {
+                TempData["Error"] = "ไม่สามารถเปลี่ยน พขร./รถ ได้ในสถานะนี้";
+                return RedirectToAction(nameof(Detail), new { id });
+            }
+
+            var driver = await _db.Drivers
+                .Include(d => d.Vehicle)
+                .FirstOrDefaultAsync(d => d.DriverId == driverId && d.IsActive);
+
+            if (driver is null || driver.Vehicle is null || !driver.Vehicle.IsActive)
+            {
+                TempData["Error"] = "ข้อมูล พขร./รถ ไม่ถูกต้อง";
+                return RedirectToAction(nameof(Detail), new { id });
+            }
+
+            if (driver.Vehicle.VehicleType != booking.VehicleTypeRequested)
+            {
+                TempData["Error"] = "ข้อมูล พขร./รถ ไม่ถูกต้อง";
+                return RedirectToAction(nameof(Detail), new { id });
+            }
+
+            // Server-side availability re-check (same pattern as TryAssignFirstAvailableCompanyVehicleAsync)
+            var startUtc = booking.StartAtUtc;
+            var endUtc   = booking.EndAtUtc;
+            bool isBusy  = await _db.Bookings.AsNoTracking().AnyAsync(b =>
+                b.BookingId != booking.BookingId &&
+                !terminal.Contains(b.Status) &&
+                b.StartAtUtc < endUtc &&
+                startUtc < b.EndAtUtc &&
+                ((b.AssignedVehicleId != null && b.AssignedVehicleId == driver.VehicleId) ||
+                 (b.AssignedDriverId  != null && b.AssignedDriverId  == driver.DriverId)));
+
+            if (isBusy)
+            {
+                TempData["Error"] = "พขร./รถ ที่เลือกไม่ว่างในช่วงวันและเวลาที่จอง กรุณาเลือกใหม่";
+                return RedirectToAction(nameof(Detail), new { id });
+            }
+
+            booking.AssignedDriverId  = driver.DriverId;
+            booking.AssignedVehicleId = driver.VehicleId;
+            booking.UpdatedAtUtc      = DateTime.UtcNow;
+
+            await _db.SaveChangesAsync();
+
+            TempData["Success"] = "เปลี่ยน พขร./รถ เรียบร้อยแล้ว";
+            return RedirectToAction(nameof(Detail), new { id });
         }
 
         // GET: /Booking/Queue
