@@ -23,7 +23,6 @@ public sealed class VehicleBookingDbContext : DbContext
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
-        // USERS
         modelBuilder.Entity<User>(e =>
         {
             e.ToTable("Users", "dbo");
@@ -126,6 +125,7 @@ public sealed class VehicleBookingDbContext : DbContext
             e.HasKey(x => x.DriverId);
 
             e.Property(x => x.Phone).HasMaxLength(50);
+            e.Property(x => x.CanDriveOutOfProvince).HasDefaultValue(false);
 
             e.Property(x => x.IsActive).HasDefaultValue(true);
             e.Property(x => x.LastAssignedAtUtc).HasColumnType("datetime2(0)");
@@ -167,6 +167,8 @@ public sealed class VehicleBookingDbContext : DbContext
             e.Property(x => x.CostCenter).HasMaxLength(50);
             e.Property(x => x.JobNo).HasMaxLength(50);
             e.Property(x => x.SONo).HasMaxLength(50);
+            e.Property(x => x.SpecialOccasionType).HasConversion<int>();
+            e.Property(x => x.SpecialOccasionRemark).HasMaxLength(500);
 
             e.Property(x => x.Status).HasConversion<int>().HasDefaultValue(BookingStatus.Draft);
             e.Property(x => x.IsExternalRental).HasDefaultValue(false);

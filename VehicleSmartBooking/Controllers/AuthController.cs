@@ -28,12 +28,30 @@ namespace VehicleSmartBooking.Controllers
         {
             if (!string.IsNullOrWhiteSpace(returnUrl) && Url.IsLocalUrl(returnUrl))
             {
-                HttpContext.Session.SetString("ReturnUrl", returnUrl);
+                var loginPath = Url.Action("Login", "Account") ?? "/account/login";
+                var returnPath = PathString.FromUriComponent(returnUrl);
+                if (!returnPath.Equals(loginPath, StringComparison.OrdinalIgnoreCase) &&
+                    !returnPath.Equals("/", StringComparison.OrdinalIgnoreCase) &&
+                    !returnPath.Equals("/login", StringComparison.OrdinalIgnoreCase) &&
+                    !returnPath.Equals("/login/index", StringComparison.OrdinalIgnoreCase))
+                {
+                    HttpContext.Session.SetString("ReturnUrl", returnUrl);
+                }
             }
 
             var baseUrl = _ssoOptions.BaseUrl?.TrimEnd('/') ?? "";
             var signInPath = _ssoOptions.SignInPath ?? "";
             var callback = _ssoOptions.CallbackUrl ?? "";
+
+            if (string.IsNullOrWhiteSpace(callback))
+            {
+                callback = Url.Action(nameof(SsoCallbackQuery), "Auth", values: null, protocol: Request.Scheme, host: Request.Host.Value) ?? "";
+            }
+
+            if (!string.IsNullOrWhiteSpace(callback) && !Uri.IsWellFormedUriString(callback, UriKind.Absolute))
+            {
+                callback = new Uri(new Uri($"{Request.Scheme}://{Request.Host}"), callback).ToString();
+            }
 
             if (string.IsNullOrWhiteSpace(baseUrl) ||
                 string.IsNullOrWhiteSpace(signInPath) ||

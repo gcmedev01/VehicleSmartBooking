@@ -1,13 +1,66 @@
+@using System.Collections.Generic
+@using VehicleBooking.Web.Domain.Enums
 @model IList<VehicleBooking.Web.Domain.Entities.Booking>
 @{
     Layout = "_VehicleBookingLayout";
     ViewData["Title"] = "Admin Worklist";
     ViewData["ActiveNav"] = "AdminWorklist";
+
+    // ---------- UI helpers ----------
+    string StatusClass(BookingStatus st) => st switch
+    {
+        BookingStatus.Completed => "vb-status-completed",
+        BookingStatus.Rated => "vb-status-completed",
+
+        BookingStatus.Rejected => "vb-status-rejected",
+        BookingStatus.Cancelled => "vb-status-rejected",
+        BookingStatus.VendorRejectedByUser => "vb-status-rejected",
+        _ => "vb-status-pending"
+    };
+
+    string StatusText(BookingStatus st) => st switch
+    {
+        BookingStatus.Draft => "ร่าง",
+        BookingStatus.Submitted => "ส่งคำขอแล้ว",
+        BookingStatus.WaitingApproval => "รออนุมัติ",
+        BookingStatus.WaitingDriverAccept => "รอพนักงานขับรถตอบรับ",
+        BookingStatus.DriverAccepted => "พนักงานขับรถตอบรับ",
+        BookingStatus.WaitingAdminVendorQuotation => "รอเสนอราคาผู้ให้บริการ",
+        BookingStatus.WaitingUserVendorAccept => "รอผู้ขอใช้ยอมรับผู้ให้บริการ",
+        BookingStatus.WaitingAdminVendorConfirm => "รอยืนยันผู้ให้บริการ",
+        BookingStatus.VendorRejectedByUser => "ผู้ขอใช้ปฏิเสธผู้ให้บริการ",
+        BookingStatus.WaitingAdminPersonal => "รอผู้ดูแลอนุมัติรถส่วนตัว",
+        BookingStatus.Completed => "เสร็จสิ้น",
+        BookingStatus.Rated => "ให้คะแนนแล้ว",
+        BookingStatus.Rejected => "ถูกปฏิเสธ",
+        BookingStatus.Cancelled => "ยกเลิก",
+        BookingStatus.AdminActionRequired => "รอผู้ดูแลดำเนินการ",
+        _ => st.ToString()
+    };
+
+    string TripChipText(TripType t) => t switch
+    {
+        TripType.InProvince => "ในจังหวัด",
+        TripType.OutProvince => "นอกจังหวัด",
+        _ => t.ToString()
+    };
+
+    string TripChipClass(TripType t) => t == TripType.OutProvince ? "vb-chip vb-chip-alt" : "vb-chip";
+
+    string VehicleText(VehicleType v) => v switch
+    {
+        VehicleType.Pickup => "รถกระบะ",
+        VehicleType.Van => "รถตู้",
+        VehicleType.Sedan => "รถเก๋ง",
+        _ => v.ToString()
+    };
 }
 
 <div class="vb-page-head vb-page-hero mb-4">
     <div class="vb-page-title">
-        <div class="vb-page-icon">???</div>
+        <div class="vb-page-icon">
+            <img src="~/img/to-do-list.png" asp-append-version="true" class="vb-page-icon-img" />
+        </div>
         <div>
             <h1 class="vb-page-h1">Admin Worklist</h1>
             <div class="vb-page-sub">Bookings that need admin attention</div>
@@ -15,39 +68,117 @@
     </div>
 </div>
 
-<div class="vb-card p-3">
-    @if (Model == null || !Model.Any())
-    {
-        <div class="text-muted">No items</div>
-    }
-    else
-    {
-        <div class="table-responsive">
-            <table class="table">
-                <thead>
+<!-- Desktop table -->
+<div class="vb-card p-0 d-none d-md-block">
+    <div class="vb-table-head px-3 px-md-4 py-3">
+        <div class="fw-semibold">รายการคำขอ</div>
+        <div class="text-muted small">คลิกเพื่อดูรายละเอียด</div>
+    </div>
+
+    <div class="table-responsive">
+        <table class="table vb-table mb-0">
+            <thead>
+                <tr>
+                    <th style="width:150px;">Booking #</th>
+                    <th style="width:160px;">ประเภท</th>
+                    <th>เส้นทาง</th>
+                    <th style="width:220px;">ช่วงเวลา</th>
+                    <th style="width:160px;">ประเภทรถ</th>
+                    <th style="width:210px;">สถานะ</th>
+                    <th style="width:110px;" class="text-end">การทำงาน</th>
+                </tr>
+            </thead>
+
+            <tbody>
+                @if (Model == null || !Model.Any())
+                {
                     <tr>
-                        <th>Booking #</th>
-                        <th>Requester</th>
-                        <th>Start</th>
-                        <th>Status</th>
-                        <th></th>
+                        <td colspan="7" class="text-center text-muted py-4">No tasks found</td>
                     </tr>
-                </thead>
-                <tbody>
-                    @foreach(var b in Model)
+                }
+                else
+                {
+                    foreach (var b in Model.OrderByDescending(x => x.StartAtUtc))
                     {
+                        var localStart = b.StartAtUtc.ToLocalTime();
+                        var localEnd = b.EndAtUtc.ToLocalTime();
+
                         <tr>
-                            <td>VS-@b.BookingId</td>
-                            <td>@(b.Requester?.UsernameTH ?? b.Requester?.UsernameEN ?? b.RequesterUserId.ToString())</td>
-                            <td>@b.StartAtUtc.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</td>
-                            <td>@b.Status</td>
+                            <td class="fw-semibold">VS-@b.BookingId</td>
+
+                            <td>
+                                <span class="@TripChipClass(b.TripType)">@TripChipText(b.TripType)</span>
+                                <div class="text-muted small mt-1">@(!string.IsNullOrWhiteSpace(b.JobNo) ? b.JobNo : "-")</div>
+                            </td>
+
+                            <td>
+                                <div class="fw-semibold">@b.PickupLocation &nbsp;&rarr;&nbsp; @b.DestinationLocation</div>
+                                <div class="text-muted small">เพื่อ: @(!string.IsNullOrWhiteSpace(b.Purpose) ? b.Purpose : "-")</div>
+                            </td>
+
+                            <td>
+                                <div class="fw-semibold">@localStart.ToString("dd/MM/yyyy HH:mm")</div>
+                                <div class="text-muted small">ถึง @localEnd.ToString("dd/MM/yyyy HH:mm")</div>
+                            </td>
+
+                            <td>
+                                <span class="vb-veh-pill">@VehicleText(b.VehicleTypeRequested)</span>
+                            </td>
+
+                            <td>
+                                <span class="vb-status @StatusClass(b.Status)">@StatusText(b.Status)</span>
+                                <div class="text-muted small mt-1">Req: @(b.Requester?.UsernameTH ?? "-")</div>
+                            </td>
+
                             <td class="text-end">
-                                <a asp-action="Detail" asp-route-id="@b.BookingId" class="btn btn-sm btn-outline-secondary">Open</a>
+                                <a asp-action="Detail" asp-route-id="@b.BookingId"
+                                   class="btn btn-sm btn-outline-secondary">
+                                    ดู
+                                </a>
                             </td>
                         </tr>
                     }
-                </tbody>
-            </table>
-        </div>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Mobile cards -->
+<div class="d-md-none">
+    @if (Model == null || !Model.Any())
+    {
+        <div class="vb-card p-3 text-center text-muted">No tasks found</div>
+    }
+    else
+    {
+        foreach (var b in Model.OrderByDescending(x => x.StartAtUtc))
+        {
+            var localStart = b.StartAtUtc.ToLocalTime();
+            var localEnd = b.EndAtUtc.ToLocalTime();
+
+            <div class="vb-history-card vb-card p-3 mb-3">
+                <div class="d-flex justify-content-between align-items-start gap-2">
+                    <div class="fw-semibold">VS-@b.BookingId</div>
+                    <span class="vb-status @StatusClass(b.Status)">@StatusText(b.Status)</span>
+                </div>
+
+                <div class="mt-2">
+                    <div class="fw-semibold">@b.PickupLocation &rarr; @b.DestinationLocation</div>
+                    <div class="text-muted small">
+                        @localStart.ToString("dd/MM/yyyy HH:mm") - @localEnd.ToString("dd/MM/yyyy HH:mm")
+                        • @VehicleText(b.VehicleTypeRequested)
+                    </div>
+                </div>
+
+                <div class="d-flex justify-content-between align-items-center mt-3">
+                    <span class="@TripChipClass(b.TripType)">@TripChipText(b.TripType)</span>
+                    <a asp-action="Detail" asp-route-id="@b.BookingId"
+                       class="btn btn-sm btn-outline-secondary">
+                        ดู
+                    </a>
+                </div>
+            </div>
+        }
     }
 </div>

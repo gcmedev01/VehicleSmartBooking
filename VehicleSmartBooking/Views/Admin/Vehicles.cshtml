@@ -7,7 +7,9 @@
 
 <div class="vb-page-head vb-page-hero mb-4">
     <div class="vb-page-title">
-        <div class="vb-page-icon">??</div>
+        <div class="vb-page-icon">
+            <img src="~/img/vehicle.png" asp-append-version="true" class="vb-page-icon-img" />
+        </div>
         <div>
             <h1 class="vb-page-h1">Vehicles</h1>
             <div class="vb-page-sub">Manage company vehicles</div>
@@ -26,7 +28,7 @@
     }
     else
     {
-        <div class="table-responsive">
+        <div class="table-responsive vb-admin-table">
             <table class="table">
                 <thead>
                     <tr>
@@ -47,7 +49,6 @@
                             <td>@(v.Driver?.User?.UsernameTH ?? v.Driver?.User?.UsernameEN ?? "-")</td>
                             <td class="text-end">
                                 <a asp-action="VehicleEdit" asp-route-id="@v.VehicleId" class="btn btn-sm btn-outline-secondary">Edit</a>
-                                <form asp-action="VehicleDelete" asp-route-id="@v.VehicleId" method="post" class="d-inline">@Html.AntiForgeryToken()<button class="btn btn-sm btn-danger">Deactivate</button></form>
                             </td>
                         </tr>
                     }

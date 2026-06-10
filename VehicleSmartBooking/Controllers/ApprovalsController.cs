@@ -168,15 +168,25 @@ namespace VehicleSmartBooking.Controllers
             {
                 booking.Status = BookingStatus.WaitingApproval;
             }
+            else if (booking.VehicleTypeRequested == VehicleType.Electric)
+            {
+                booking.Status = BookingStatus.ApprovedSelfDrive;
+            }
             else if (booking.IsPersonal)
             {
                 booking.Status = BookingStatus.Completed;
             }
             else
             {
-                // if booking uses external rental, after approvals it should return to admin to confirm vendor details
-                booking.Status = booking.IsExternalRental ? BookingStatus.WaitingAdminVendorConfirm : BookingStatus.WaitingDriverAccept;
+                // if booking uses external rental:
+                // - special occasion: admin fills price and complete
+                // - normal flow: admin confirms vendor details
+                booking.Status = booking.IsExternalRental
+                    ? (booking.SpecialOccasionType.HasValue ? BookingStatus.WaitingAdminVendorQuotation : BookingStatus.WaitingAdminVendorConfirm)
+                    : BookingStatus.WaitingDriverAccept;
             }
+
+            booking.UpdatedAtUtc = DateTime.UtcNow;
 
             await _db.SaveChangesAsync();
 

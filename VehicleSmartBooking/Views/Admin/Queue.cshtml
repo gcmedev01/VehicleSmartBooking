@@ -41,7 +41,9 @@
 <div class="vb-queue-page">
     <div class="vb-page-head vb-page-hero mb-4">
         <div class="vb-page-title">
-            <div class="vb-page-icon">📅</div>
+            <div class="vb-page-icon">
+                <img src="~/img/calendar.png" asp-append-version="true" class="vb-page-icon-img" />
+            </div>
             <div>
                 <h1 class="vb-page-h1">Vehicle Queue</h1>
                 <div class="vb-page-sub">ตรวจสอบการจองรถตามวันและช่วงเวลา</div>
@@ -82,6 +84,9 @@
                 <div class="vb-legend-item">
                     <span class="vb-queue-legend-dot vb-queue-legend-sedan"></span> รถเก๋ง
                 </div>
+                <div class="vb-legend-item">
+                    <span class="vb-queue-legend-dot vb-queue-legend-electric"></span> รถไฟฟ้า
+                </div>
             </div>
         </div>
 
@@ -112,6 +117,8 @@
                     return "รถตู้";
                 case "Sedan":
                     return "รถเก๋ง";
+                case "Electric":
+                    return "รถไฟฟ้า";
                 default:
                     return type;
             }
@@ -259,9 +266,11 @@
 
                         const typeColor = slot.type === "Pickup" ? "rgba(11,94,215,.12)" :
                                           slot.type === "Van" ? "rgba(32,201,151,.14)" :
+                                          slot.type === "Electric" ? "rgba(13,202,240,.16)" :
                                           "rgba(255,193,7,.16)";
                         const typeBorder = slot.type === "Pickup" ? "rgba(11,94,215,.35)" :
                                            slot.type === "Van" ? "rgba(32,201,151,.35)" :
+                                           slot.type === "Electric" ? "rgba(13,202,240,.4)" :
                                            "rgba(255,193,7,.4)";
 
                         block.style.background = typeColor;

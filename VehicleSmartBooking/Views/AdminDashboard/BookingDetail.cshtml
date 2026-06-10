@@ -1,4 +1,4 @@
-@model VehicleBooking.Web.Domain.Entities.Booking
+﻿@model VehicleBooking.Web.Domain.Entities.Booking
 @using VehicleBooking.Web.Domain.Enums
 @using System.Net
 
@@ -10,6 +10,41 @@
     {
         return;
     }
+
+    string TripText(TripType t) => t switch
+    {
+        TripType.InProvince => "ในจังหวัด",
+        TripType.OutProvince => "นอกจังหวัด",
+        _ => t.ToString()
+    };
+
+    string VehicleText(VehicleType v) => v switch
+    {
+        VehicleType.Pickup => "รถกระบะ",
+        VehicleType.Van => "รถตู้",
+        VehicleType.Sedan => "รถเก๋ง",
+        _ => v.ToString()
+    };
+
+    string StatusText(BookingStatus st) => st switch
+    {
+        BookingStatus.Draft => "ร่าง",
+        BookingStatus.Submitted => "ส่งคำขอแล้ว",
+        BookingStatus.WaitingApproval => "รออนุมัติ",
+        BookingStatus.WaitingDriverAccept => "รอพนักงานขับรถตอบรับ",
+        BookingStatus.DriverAccepted => "พนักงานขับรถตอบรับ",
+        BookingStatus.WaitingAdminVendorQuotation => "รอเสนอราคาผู้ให้บริการ",
+        BookingStatus.WaitingUserVendorAccept => "รอผู้ขอใช้ยอมรับผู้ให้บริการ",
+        BookingStatus.WaitingAdminVendorConfirm => "รอยืนยันผู้ให้บริการ",
+        BookingStatus.VendorRejectedByUser => "ผู้ขอใช้ปฏิเสธผู้ให้บริการ",
+        BookingStatus.WaitingAdminPersonal => "รอผู้ดูแลอนุมัติรถส่วนตัว",
+        BookingStatus.Completed => "เสร็จสิ้น",
+        BookingStatus.Rated => "ให้คะแนนแล้ว",
+        BookingStatus.Rejected => "ถูกปฏิเสธ",
+        BookingStatus.Cancelled => "ยกเลิก",
+        BookingStatus.AdminActionRequired => "รอผู้ดูแลดำเนินการ",
+        _ => st.ToString()
+    };
 
     var returnUrl = ViewData["ReturnUrl"] as string;
     if (string.IsNullOrWhiteSpace(returnUrl))
@@ -30,15 +65,23 @@
     var vehiclePlate = Model.AssignedVehicle?.PlateNo ?? Model.AssignedVehicleId?.ToString() ?? "-";
 }
 
-<div class="d-flex align-items-center justify-content-between mb-3">
-    <div>
-        <h1 class="h4 mb-1">Booking #@Model.BookingId</h1>
-        <div class="text-muted">@requesterName</div>
+<div class="vb-page-head vb-page-hero mb-4">
+    <div class="vb-page-title">
+        <div class="vb-page-icon">
+            <img src="~/img/survey.png" asp-append-version="true" class="vb-page-icon-img" />
+        </div>
+        <div>
+            <h1 class="vb-page-h1">Booking #@Model.BookingId</h1>
+            <div class="vb-page-sub">@requesterName</div>
+        </div>
     </div>
-    <a class="btn btn-outline-secondary" href="@returnUrl">Back to Dashboard</a>
+
+    <div class="vb-page-meta d-none d-md-flex">
+        <a class="btn btn-light" href="@returnUrl">Back to Dashboard</a>
+    </div>
 </div>
 
-<ul class="nav nav-tabs" id="bookingDetailTabs" role="tablist">
+<ul class="nav nav-tabs mb-0" id="bookingDetailTabs" role="tablist">
     <li class="nav-item" role="presentation">
         <button class="nav-link active" id="summary-tab" data-bs-toggle="tab" data-bs-target="#summary" type="button" role="tab">Summary</button>
     </li>
@@ -62,63 +105,59 @@
     </li>
 </ul>
 
-<div class="tab-content border border-top-0 p-3 bg-white" id="bookingDetailTabContent">
+<div class="tab-content vb-card p-3 p-md-4" id="bookingDetailTabContent">
     <div class="tab-pane fade show active" id="summary" role="tabpanel">
         <div class="row g-3">
             <div class="col-12 col-lg-6">
-                <div class="card h-100">
-                    <div class="card-body">
-                        <h6 class="card-title">Booking Summary</h6>
-                        <div class="row g-2">
-                            <div class="col-6">
-                                <div class="text-muted small">Status</div>
-                                <div>@Model.Status</div>
-                            </div>
-                            <div class="col-6">
-                                <div class="text-muted small">Trip Type</div>
-                                <div>@Model.TripType</div>
-                            </div>
-                            <div class="col-6">
-                                <div class="text-muted small">Vehicle Type</div>
-                                <div>@Model.VehicleTypeRequested</div>
-                            </div>
-                            <div class="col-6">
-                                <div class="text-muted small">Requester</div>
-                                <div>@requesterName</div>
-                            </div>
-                            <div class="col-6">
-                                <div class="text-muted small">Driver</div>
-                                <div>@driverName</div>
-                            </div>
-                            <div class="col-6">
-                                <div class="text-muted small">Vehicle</div>
-                                <div>@vehiclePlate</div>
-                            </div>
-                            <div class="col-12">
-                                <div class="text-muted small">Route</div>
-                                <div>@Model.PickupLocation ? @Model.DestinationLocation</div>
-                            </div>
-                            <div class="col-6">
-                                <div class="text-muted small">Start</div>
-                                <div>@Model.StartAtUtc.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</div>
-                            </div>
-                            <div class="col-6">
-                                <div class="text-muted small">End</div>
-                                <div>@Model.EndAtUtc.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</div>
-                            </div>
+                <div class="vb-card p-3 p-md-4 h-100">
+                    <div class="fw-semibold mb-2">Booking Summary</div>
+                    <div class="row g-2">
+                        <div class="col-6">
+                            <div class="text-muted small">Status</div>
+                            <div>@StatusText(Model.Status)</div>
+                        </div>
+                        <div class="col-6">
+                            <div class="text-muted small">Trip Type</div>
+                            <div>@TripText(Model.TripType)</div>
+                        </div>
+                        <div class="col-6">
+                            <div class="text-muted small">Vehicle Type</div>
+                            <div>@VehicleText(Model.VehicleTypeRequested)</div>
+                        </div>
+                        <div class="col-6">
+                            <div class="text-muted small">Requester</div>
+                            <div>@requesterName</div>
+                        </div>
+                        <div class="col-6">
+                            <div class="text-muted small">Driver</div>
+                            <div>@driverName</div>
+                        </div>
+                        <div class="col-6">
+                            <div class="text-muted small">Vehicle</div>
+                            <div>@vehiclePlate</div>
+                        </div>
+                        <div class="col-12">
+                            <div class="text-muted small">Route</div>
+                            <div>@Model.PickupLocation &rarr; @Model.DestinationLocation</div>
+                        </div>
+                        <div class="col-6">
+                            <div class="text-muted small">Start</div>
+                            <div>@Model.StartAtUtc.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</div>
+                        </div>
+                        <div class="col-6">
+                            <div class="text-muted small">End</div>
+                            <div>@Model.EndAtUtc.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</div>
                         </div>
                     </div>
                 </div>
             </div>
             <div class="col-12 col-lg-6">
-                <div class="card h-100">
-                    <div class="card-body">
-                        <h6 class="card-title">Notes</h6>
-                        <div class="text-muted small">Purpose</div>
-                        <div class="mb-2">@(string.IsNullOrWhiteSpace(Model.Purpose) ? "-" : Model.Purpose)</div>
-                        <div class="text-muted small">Detail</div>
-                        <div>@(string.IsNullOrWhiteSpace(Model.DetailNote) ? "-" : Model.DetailNote)</div>
-                    </div>
+                <div class="vb-card p-3 p-md-4 h-100">
+                    <div class="fw-semibold mb-2">Notes</div>
+                    <div class="text-muted small">Purpose</div>
+                    <div class="mb-2">@(string.IsNullOrWhiteSpace(Model.Purpose) ? "-" : Model.Purpose)</div>
+                    <div class="text-muted small">Detail</div>
+                    <div>@(string.IsNullOrWhiteSpace(Model.DetailNote) ? "-" : Model.DetailNote)</div>
                 </div>
             </div>
         </div>
@@ -131,7 +170,7 @@
         else
         {
             <div class="table-responsive">
-                <table class="table table-sm align-middle">
+                <table class="table table-sm align-middle vb-table">
                     <thead>
                         <tr class="text-muted">
                             <th>Level</th>
@@ -164,7 +203,7 @@
         else
         {
             <div class="table-responsive">
-                <table class="table table-sm align-middle">
+                <table class="table table-sm align-middle vb-table">
                     <thead>
                         <tr class="text-muted">
                             <th>Attempt</th>
@@ -201,27 +240,23 @@
         {
             <div class="row g-3">
                 <div class="col-12 col-lg-6">
-                    <div class="card">
-                        <div class="card-body">
-                            <div class="text-muted small">Vendor</div>
-                            <div class="mb-2">@Model.ExternalRental.VendorName</div>
-                            <div class="text-muted small">Quoted Price</div>
-                            <div class="mb-2">@(Model.ExternalRental.QuotedPrice?.ToString("N2") ?? "-")</div>
-                            <div class="text-muted small">Decision</div>
-                            <div>@Model.ExternalRental.UserDecision</div>
-                        </div>
+                    <div class="vb-card p-3 p-md-4 h-100">
+                        <div class="text-muted small">Vendor</div>
+                        <div class="mb-2">@Model.ExternalRental.VendorName</div>
+                        <div class="text-muted small">Quoted Price</div>
+                        <div class="mb-2">@(Model.ExternalRental.QuotedPrice?.ToString("N2") ?? "-")</div>
+                        <div class="text-muted small">Decision</div>
+                        <div>@Model.ExternalRental.UserDecision</div>
                     </div>
                 </div>
                 <div class="col-12 col-lg-6">
-                    <div class="card">
-                        <div class="card-body">
-                            <div class="text-muted small">Rental Plate</div>
-                            <div class="mb-2">@(Model.ExternalRental.RentalPlateNo ?? "-")</div>
-                            <div class="text-muted small">Driver</div>
-                            <div class="mb-2">@(Model.ExternalRental.RentalDriverName ?? "-")</div>
-                            <div class="text-muted small">Phone</div>
-                            <div>@(Model.ExternalRental.RentalDriverPhone ?? "-")</div>
-                        </div>
+                    <div class="vb-card p-3 p-md-4 h-100">
+                        <div class="text-muted small">Rental Plate</div>
+                        <div class="mb-2">@(Model.ExternalRental.RentalPlateNo ?? "-")</div>
+                        <div class="text-muted small">Driver</div>
+                        <div class="mb-2">@(Model.ExternalRental.RentalDriverName ?? "-")</div>
+                        <div class="text-muted small">Phone</div>
+                        <div>@(Model.ExternalRental.RentalDriverPhone ?? "-")</div>
                     </div>
                 </div>
             </div>
@@ -238,7 +273,7 @@
         else
         {
             <div class="table-responsive">
-                <table class="table table-sm align-middle">
+                <table class="table table-sm align-middle vb-table">
                     <thead>
                         <tr class="text-muted">
                             <th>File</th>
@@ -268,13 +303,11 @@
         else
         {
             var avg = (Model.Rating.Score1 + Model.Rating.Score2 + Model.Rating.Score3 + Model.Rating.Score4 + Model.Rating.Score5) / 5.0;
-            <div class="card">
-                <div class="card-body">
-                    <div class="text-muted small">Average Score</div>
-                    <div class="fs-4 fw-semibold">@avg.ToString("0.0")</div>
-                    <div class="text-muted small">Comment</div>
-                    <div>@(string.IsNullOrWhiteSpace(Model.Rating.Comment) ? "-" : Model.Rating.Comment)</div>
-                </div>
+            <div class="vb-card p-3 p-md-4">
+                <div class="text-muted small">Average Score</div>
+                <div class="fs-4 fw-semibold">@avg.ToString("0.0")</div>
+                <div class="text-muted small">Comment</div>
+                <div>@(string.IsNullOrWhiteSpace(Model.Rating.Comment) ? "-" : Model.Rating.Comment)</div>
             </div>
         }
     </div>

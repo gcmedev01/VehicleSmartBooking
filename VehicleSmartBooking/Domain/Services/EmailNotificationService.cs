@@ -98,10 +98,10 @@ public sealed class EmailNotificationService : IEmailNotificationService
         var safeLink = string.IsNullOrWhiteSpace(detailLink) ? null : WebUtility.HtmlEncode(detailLink);
 
         var sb = new StringBuilder()
-            .AppendLine("<div style=\"font-family:Arial,Helvetica,sans-serif;font-size:14px;\">")
-            .AppendLine($"<div><strong>Booking:</strong> #{booking.BookingId}</div>")
-            .AppendLine($"<div><strong>ผู้ขอใช้:</strong> {safeRequester}</div>")
-            .AppendLine($"<div><strong>สถานะ:</strong> {safeStatus}</div>");
+    .AppendLine("<div style=\"font-family:Arial,Helvetica,sans-serif;font-size:16px;line-height:1.6;\">")
+    .AppendLine($"<div><strong>Booking:</strong> #{booking.BookingId}</div>")
+    .AppendLine($"<div><strong>ผู้ขอใช้:</strong> {safeRequester}</div>")
+    .AppendLine($"<div><strong>สถานะ:</strong> {safeStatus}</div>");
 
         if (changeTime.HasValue)
         {

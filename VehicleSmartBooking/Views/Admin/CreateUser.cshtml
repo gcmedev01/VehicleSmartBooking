@@ -1,0 +1,114 @@
+@model VehicleSmartBooking.Controllers.AdminController.CreateUserVm
+@{
+    Layout = "_VehicleBookingLayout";
+    ViewData["Title"] = "Create User";
+    ViewData["ActiveNav"] = "AdminUsers";
+}
+
+<div class="vb-page-head vb-page-hero mb-4">
+    <div class="vb-page-title">
+        <div class="vb-page-icon">
+            <img src="~/img/man.png" asp-append-version="true" class="vb-page-icon-img" />
+        </div>
+        <div>
+            <h1 class="vb-page-h1">Create User</h1>
+            <div class="vb-page-sub">เพิ่มบัญชีผู้ใช้งานแบบ local พร้อมกำหนดสิทธิ์และรหัสผ่านเริ่มต้น</div>
+        </div>
+    </div>
+</div>
+
+<div class="vb-card p-3 p-md-4">
+    <form asp-action="CreateUser" method="post" novalidate>
+        @Html.AntiForgeryToken()
+
+        <div class="text-danger small mb-3" asp-validation-summary="ModelOnly"></div>
+
+        <div class="row g-3">
+            <div class="col-12 col-md-4">
+                <label asp-for="UserCode" class="form-label"></label>
+                <input asp-for="UserCode" class="form-control" placeholder="เช่น USER001" />
+                <span asp-validation-for="UserCode" class="text-danger small"></span>
+                <div class="text-muted small mt-1">ใช้เป็น Username สำหรับ login</div>
+            </div>
+
+            <div class="col-12 col-md-4">
+                <label asp-for="UsernameTH" class="form-label">ชื่อ-สกุล (TH)</label>
+                <input asp-for="UsernameTH" class="form-control" placeholder="เช่น นาย สมชาย เหมาะสม" />
+                <span asp-validation-for="UsernameTH" class="text-danger small"></span>
+            </div>
+
+            <div class="col-12 col-md-4">
+                <label asp-for="UsernameEN" class="form-label">Name (EN)</label>
+                <input asp-for="UsernameEN" class="form-control" placeholder="เช่น Somchai Homsom" />
+                <span asp-validation-for="UsernameEN" class="text-danger small"></span>
+            </div>
+
+            <div class="col-12 col-md-4">
+                <label asp-for="Email" class="form-label"></label>
+                <input asp-for="Email" class="form-control" placeholder="เช่น user@company.com" />
+                <span asp-validation-for="Email" class="text-danger small"></span>
+            </div>
+
+            <div class="col-12 col-md-4">
+                <label asp-for="FunctionAbbr" class="form-label">Function</label>
+                <input asp-for="FunctionAbbr" class="form-control" placeholder="เช่น IT" />
+                <span asp-validation-for="FunctionAbbr" class="text-danger small"></span>
+            </div>
+
+            <div class="col-12 col-md-4">
+                <label asp-for="DeptAbbr" class="form-label">Dept</label>
+                <input asp-for="DeptAbbr" class="form-control" placeholder="เช่น APP" />
+                <span asp-validation-for="DeptAbbr" class="text-danger small"></span>
+            </div>
+
+            <div class="col-12 col-md-4">
+                <label asp-for="DivAbbr" class="form-label">Div</label>
+                <input asp-for="DivAbbr" class="form-control" placeholder="เช่น DX" />
+                <span asp-validation-for="DivAbbr" class="text-danger small"></span>
+            </div>
+
+            <div class="col-12 col-md-4">
+                <label asp-for="PositionTH" class="form-label">Position (TH)</label>
+                <input asp-for="PositionTH" class="form-control" placeholder="เช่น เจ้าหน้าที่" />
+                <span asp-validation-for="PositionTH" class="text-danger small"></span>
+            </div>
+
+            <div class="col-12 col-md-4">
+                <label asp-for="PositionEN" class="form-label">Position (EN)</label>
+                <input asp-for="PositionEN" class="form-control" placeholder="เช่น Officer" />
+                <span asp-validation-for="PositionEN" class="text-danger small"></span>
+            </div>
+
+            <div class="col-12">
+                <label class="form-label fw-semibold">Roles</label>
+                <div class="d-flex flex-wrap gap-2">
+                    <input class="btn-check" asp-for="RoleUser" />
+                    <label class="btn btn-outline-secondary rounded-pill" asp-for="RoleUser">User</label>
+
+                    <input class="btn-check" asp-for="RoleAdmin" />
+                    <label class="btn btn-outline-secondary rounded-pill" asp-for="RoleAdmin">Admin</label>
+
+                    <input class="btn-check" asp-for="RoleApprover" />
+                    <label class="btn btn-outline-secondary rounded-pill" asp-for="RoleApprover">Approver</label>
+                </div>
+                <div class="text-muted small mt-2">เลือกได้มากกว่า 1 สิทธิ์</div>
+            </div>
+
+            <div class="col-12">
+                <div class="form-check mt-1">
+                    <input class="form-check-input" asp-for="IsActive" />
+                    <label class="form-check-label" asp-for="IsActive">Active</label>
+                </div>
+            </div>
+        </div>
+
+        <div class="d-flex gap-2 justify-content-end mt-4">
+            <a asp-action="Users" class="btn btn-light">Cancel</a>
+            <button type="submit" class="btn btn-ci">Save User</button>
+        </div>
+    </form>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

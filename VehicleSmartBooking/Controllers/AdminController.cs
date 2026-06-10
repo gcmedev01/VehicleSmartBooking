@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Authentication;
+﻿using ClosedXML.Excel;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
@@ -24,29 +25,20 @@ namespace VehicleSmartBooking.Controllers
         private readonly ILogger<AdminController> _logger;
         private readonly IPasswordHasher _hasher;
         private readonly IEmailNotificationService _emailNotifications;
+        private readonly ApprovalChainBuilder _approvalChainBuilder;
 
         private const int ROLE_USER = 1;
         private const int ROLE_DRIVER = 4;
         private const int ROLE_ADMIN = 2;
         private const int ROLE_APPROVER = 8;
 
-        public AdminController(VehicleBookingDbContext db, ILogger<AdminController> logger, IPasswordHasher hasher, IEmailNotificationService emailNotifications)
+        public AdminController(VehicleBookingDbContext db, ILogger<AdminController> logger, IPasswordHasher hasher, IEmailNotificationService emailNotifications, ApprovalChainBuilder approvalChainBuilder)
         {
             _db = db;
             _logger = logger;
             _hasher = hasher;
             _emailNotifications = emailNotifications;
-        }
-
-        // ===== Operations =====
-        // GET: /Admin/Dashboard
-        [HttpGet]
-        public async Task<IActionResult> Dashboard()
-        {
-            ViewData["ActiveNav"] = "Dashboard";
-
-
-            return View();
+            _approvalChainBuilder = approvalChainBuilder;
         }
 
         // GET: /Admin/Worklist
@@ -68,26 +60,208 @@ namespace VehicleSmartBooking.Controllers
         }
 
         [Authorize]
-        public async Task<IActionResult> AllBookings()
+        public async Task<IActionResult> AllBookings(DateTime? startDate, DateTime? endDate, string? functionAbbr, string? deptAbbr, string? divAbbr)
         {
             ViewData["ActiveNav"] = "AllTasks";
+            ViewBag.StartDate = startDate?.ToString("yyyy-MM-dd");
+            ViewBag.EndDate = endDate?.ToString("yyyy-MM-dd");
+            ViewBag.FunctionAbbr = functionAbbr?.Trim();
+            ViewBag.DeptAbbr = deptAbbr?.Trim();
+            ViewBag.DivAbbr = divAbbr?.Trim();
+
+            await PopulateBookingFilterOptionsAsync();
+
+            if (startDate.HasValue && endDate.HasValue && endDate.Value.Date < startDate.Value.Date)
+            {
+                TempData["Error"] = "วันที่สิ้นสุดต้องมากกว่าหรือเท่ากับวันที่เริ่มต้น";
+                return View(new List<Booking>());
+            }
 
             var userCodeClaim = User?.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             if (string.IsNullOrWhiteSpace(userCodeClaim))
             {
                 return View(new List<Booking>());
             }
-            var bookings = await _db.Bookings
+
+            var query = _db.Bookings
                 .AsNoTracking()
                 .Include(b => b.Requester)
+                .AsQueryable();
+
+            if (!string.IsNullOrWhiteSpace(functionAbbr))
+            {
+                var term = functionAbbr.Trim();
+                query = query.Where(b => b.Requester.FunctionAbbr == term);
+            }
+
+            if (!string.IsNullOrWhiteSpace(deptAbbr))
+            {
+                var term = deptAbbr.Trim();
+                query = query.Where(b => b.Requester.DeptAbbr == term);
+            }
+
+            if (!string.IsNullOrWhiteSpace(divAbbr))
+            {
+                var term = divAbbr.Trim();
+                query = query.Where(b => b.Requester.DivAbbr == term);
+            }
+
+            var (startUtc, endExclusiveUtc) = BuildUtcDateRange(startDate, endDate);
+            if (startUtc.HasValue)
+            {
+                query = query.Where(b => b.StartAtUtc >= startUtc.Value);
+            }
+
+            if (endExclusiveUtc.HasValue)
+            {
+                query = query.Where(b => b.StartAtUtc < endExclusiveUtc.Value);
+            }
+
+            var bookings = await query
                 .OrderByDescending(b => b.StartAtUtc)
                 .ToListAsync();
 
             return View(bookings);
         }
 
-        // GET: /Admin/Booking/{id}
         [HttpGet]
+        public async Task<IActionResult> ExportBookingsExcel(DateTime? startDate, DateTime? endDate, string? functionAbbr, string? deptAbbr, string? divAbbr)
+        {
+            ViewData["ActiveNav"] = "AllTasks";
+
+            if (startDate.HasValue && endDate.HasValue && endDate.Value.Date < startDate.Value.Date)
+            {
+                TempData["Error"] = "วันที่สิ้นสุดต้องมากกว่าหรือเท่ากับวันที่เริ่มต้น";
+                return RedirectToAction(nameof(AllBookings), new { startDate, endDate, functionAbbr, deptAbbr, divAbbr });
+            }
+
+            var query = _db.Bookings
+                .AsNoTracking()
+                .Include(b => b.Requester)
+                .Include(b => b.AssignedVehicle)
+                .Include(b => b.AssignedDriver)
+                    .ThenInclude(d => d.User)
+                .Include(b => b.ExternalRental)
+                .AsQueryable();
+
+            if (!string.IsNullOrWhiteSpace(functionAbbr))
+            {
+                var term = functionAbbr.Trim();
+                query = query.Where(b => b.Requester.FunctionAbbr == term);
+            }
+
+            if (!string.IsNullOrWhiteSpace(deptAbbr))
+            {
+                var term = deptAbbr.Trim();
+                query = query.Where(b => b.Requester.DeptAbbr == term);
+            }
+
+            if (!string.IsNullOrWhiteSpace(divAbbr))
+            {
+                var term = divAbbr.Trim();
+                query = query.Where(b => b.Requester.DivAbbr == term);
+            }
+
+            var (startUtc, endExclusiveUtc) = BuildUtcDateRange(startDate, endDate);
+            if (startUtc.HasValue)
+            {
+                query = query.Where(b => b.StartAtUtc >= startUtc.Value);
+            }
+
+            if (endExclusiveUtc.HasValue)
+            {
+                query = query.Where(b => b.StartAtUtc < endExclusiveUtc.Value);
+            }
+
+            var bookings = await query
+                .OrderByDescending(b => b.StartAtUtc)
+                .ToListAsync();
+
+            using var workbook = new XLWorkbook();
+            var worksheet = workbook.Worksheets.Add("Bookings Report");
+
+            var headers = new[]
+            {
+                "Booking #",
+                "วันที่เริ่มต้น",
+                "วันที่สิ้นสุด",
+                "ผู้ขอรถ",
+                "รหัสพนักงาน",
+                "ประเภทการเดินทาง",
+                "ประเภทรถ",
+                "ประเภทบริการ",
+                "สถานะ",
+                "จุดรับ",
+                "ปลายทาง",
+                "วัตถุประสงค์",
+                "จำนวนผู้โดยสาร",
+                "เลขอ้างอิง",
+                "Cost Center",
+                "SO No",
+                "ทะเบียนรถ",
+                "พนักงานขับรถ",
+                "Vendor",
+                "Vendor Price",
+                "วันที่สร้างรายการ"
+            };
+
+            for (var i = 0; i < headers.Length; i++)
+            {
+                worksheet.Cell(1, i + 1).Value = headers[i];
+            }
+
+            var headerRange = worksheet.Range(1, 1, 1, headers.Length);
+            headerRange.Style.Font.Bold = true;
+            headerRange.Style.Fill.BackgroundColor = XLColor.FromHtml("#D9EAF7");
+
+            for (var index = 0; index < bookings.Count; index++)
+            {
+                var booking = bookings[index];
+                var row = index + 2;
+
+                worksheet.Cell(row, 1).Value = $"VS-{booking.BookingId}";
+                worksheet.Cell(row, 2).Value = booking.StartAtUtc.ToLocalTime();
+                worksheet.Cell(row, 3).Value = booking.EndAtUtc.ToLocalTime();
+                worksheet.Cell(row, 4).Value = booking.Requester?.UsernameTH ?? booking.Requester?.UsernameEN ?? string.Empty;
+                worksheet.Cell(row, 5).Value = booking.Requester?.UserCode ?? string.Empty;
+                worksheet.Cell(row, 6).Value = GetTripTypeText(booking.TripType);
+                worksheet.Cell(row, 7).Value = GetVehicleTypeText(booking.VehicleTypeRequested);
+                worksheet.Cell(row, 8).Value = GetServiceTypeText(booking);
+                worksheet.Cell(row, 9).Value = GetBookingStatusText(booking.Status);
+                worksheet.Cell(row, 10).Value = booking.PickupLocation;
+                worksheet.Cell(row, 11).Value = booking.DestinationLocation;
+                worksheet.Cell(row, 12).Value = booking.Purpose ?? string.Empty;
+                worksheet.Cell(row, 13).Value = booking.PassengerCount;
+                worksheet.Cell(row, 14).Value = booking.JobNo ?? string.Empty;
+                worksheet.Cell(row, 15).Value = booking.CostCenter ?? string.Empty;
+                worksheet.Cell(row, 16).Value = booking.SONo ?? string.Empty;
+                worksheet.Cell(row, 17).Value = booking.AssignedVehicle?.PlateNo ?? booking.ExternalRental?.RentalPlateNo ?? string.Empty;
+                worksheet.Cell(row, 18).Value = booking.AssignedDriver?.User?.UsernameTH ?? booking.AssignedDriver?.User?.UsernameEN ?? booking.ExternalRental?.RentalDriverName ?? string.Empty;
+                worksheet.Cell(row, 19).Value = booking.ExternalRental?.VendorName ?? string.Empty;
+                worksheet.Cell(row, 20).Value = booking.ExternalRental?.QuotedPrice;
+                worksheet.Cell(row, 21).Value = booking.CreatedAtUtc.ToLocalTime();
+            }
+
+            worksheet.Column(2).Style.DateFormat.Format = "dd/MM/yyyy HH:mm";
+            worksheet.Column(3).Style.DateFormat.Format = "dd/MM/yyyy HH:mm";
+            worksheet.Column(21).Style.DateFormat.Format = "dd/MM/yyyy HH:mm";
+            worksheet.Column(20).Style.NumberFormat.Format = "#,##0.00";
+            worksheet.SheetView.FreezeRows(1);
+            worksheet.Columns().AdjustToContents();
+
+            using var stream = new MemoryStream();
+            workbook.SaveAs(stream);
+            stream.Position = 0;
+
+            var fileName = $"booking-report-{BuildDateRangeFileSuffix(startDate, endDate)}.xlsx";
+            return File(
+                stream.ToArray(),
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                fileName);
+        }
+
+        // GET: /Admin/Booking/{id}
+        /*[HttpGet]
         public async Task<IActionResult> Booking(long id)
         {
             ViewData["ActiveNav"] = "AdminWorklist";
@@ -102,7 +276,7 @@ namespace VehicleSmartBooking.Controllers
             if (booking == null) return NotFound();
 
             return View(booking);
-        }
+        }*/
 
         // POST: /Admin/SendVendorQuote/{id}
         [HttpPost]
@@ -118,18 +292,19 @@ namespace VehicleSmartBooking.Controllers
             if (model == null)
             {
                 TempData["Error"] = "Invalid vendor data.";
-                return RedirectToAction(nameof(Booking), new { id });
+                return RedirectToAction(nameof(Detail), new { id });
             }
 
             // basic validation
             if (string.IsNullOrWhiteSpace(model.VendorName) && model.QuotedPrice == null)
             {
                 TempData["Error"] = "Vendor name or quoted price is required.";
-                return RedirectToAction(nameof(Booking), new { id });
+                return RedirectToAction(nameof(Detail), new { id });
             }
 
             // upsert ExternalRental
             var now = DateTime.UtcNow;
+            var isSpecialOccasion = booking.SpecialOccasionType.HasValue;
             try
             {
                 if (booking.ExternalRental == null)
@@ -140,9 +315,10 @@ namespace VehicleSmartBooking.Controllers
                         VendorName = model.VendorName,
                         QuotedPrice = model.QuotedPrice,
                         QuoteSentAtUtc = now,
-                        UserDecision = ExternalUserDecision.Pending,
-                        UserDecisionAtUtc = null,
-                        Note = model.Note
+                        UserDecision = isSpecialOccasion ? ExternalUserDecision.Accepted : ExternalUserDecision.Pending,
+                        UserDecisionAtUtc = isSpecialOccasion ? now : null,
+                        Note = model.Note,
+                        AdminClosedAtUtc = isSpecialOccasion ? now : null
                     };
                     _db.ExternalRentals.Add(booking.ExternalRental);
                 }
@@ -151,27 +327,44 @@ namespace VehicleSmartBooking.Controllers
                     booking.ExternalRental.VendorName = model.VendorName;
                     booking.ExternalRental.QuotedPrice = model.QuotedPrice;
                     booking.ExternalRental.QuoteSentAtUtc = now;
-                    booking.ExternalRental.UserDecision = ExternalUserDecision.Pending;
-                    booking.ExternalRental.UserDecisionAtUtc = null;
+                    booking.ExternalRental.UserDecision = isSpecialOccasion ? ExternalUserDecision.Accepted : ExternalUserDecision.Pending;
+                    booking.ExternalRental.UserDecisionAtUtc = isSpecialOccasion ? now : null;
                     booking.ExternalRental.Note = model.Note;
+                    booking.ExternalRental.AdminClosedAtUtc = isSpecialOccasion ? now : null;
                 }
 
                 booking.IsExternalRental = true;
-                booking.Status = BookingStatus.WaitingUserVendorAccept;
+                booking.Status = isSpecialOccasion
+                    ? BookingStatus.Completed
+                    : BookingStatus.WaitingUserVendorAccept;
                 booking.UpdatedAtUtc = now;
 
                 await _db.SaveChangesAsync();
 
                 if (!string.IsNullOrWhiteSpace(booking.Requester?.Email))
                 {
-                    await _emailNotifications.NotifyActionRequiredAsync(
-                        booking,
-                        new[] { booking.Requester.Email },
-                        "กรุณายอมรับหรือปฏิเสธผู้ให้บริการ",
-                        relativeUrl: $"/Booking/Detail/{booking.BookingId}");
+                    if (isSpecialOccasion)
+                    {
+                        await _emailNotifications.NotifyStatusChangedAsync(
+                            booking,
+                            Array.Empty<string>(),
+                            booking.Requester.Email,
+                            statusChangedAtUtc: booking.UpdatedAtUtc,
+                            relativeUrl: $"/Booking/Detail/{booking.BookingId}");
+                    }
+                    else
+                    {
+                        await _emailNotifications.NotifyActionRequiredAsync(
+                            booking,
+                            new[] { booking.Requester.Email },
+                            "กรุณายอมรับหรือปฏิเสธผู้ให้บริการ",
+                            relativeUrl: $"/Booking/Detail/{booking.BookingId}");
+                    }
                 }
 
-                TempData["Success"] = "Vendor quote sent.";
+                TempData["Success"] = isSpecialOccasion
+                    ? "บันทึกราคารถภายนอกเรียบร้อย และปิดงานแล้ว"
+                    : "Vendor quote sent.";
             }
             catch (Exception ex)
             {
@@ -179,14 +372,14 @@ namespace VehicleSmartBooking.Controllers
                 TempData["Error"] = "Failed to save vendor quote. See logs.";
             }
 
-            return RedirectToAction(nameof(Booking), new { id });
+            return RedirectToAction(nameof(Detail), new { id });
         }
 
         // GET helper: redirect GET requests for SendVendorQuote to booking page
         [HttpGet("/Admin/SendVendorQuote/{id:long}")]
         public IActionResult SendVendorQuoteGet(long id)
         {
-            return RedirectToAction(nameof(Booking), new { id });
+            return RedirectToAction(nameof(Detail), new { id });
         }
 
         // POST: /Admin/ConfirmVendor/{id}
@@ -213,7 +406,7 @@ namespace VehicleSmartBooking.Controllers
             booking.Status = BookingStatus.AdminActionRequired;
 
             await _db.SaveChangesAsync();
-            return RedirectToAction(nameof(Booking), new { id });
+            return RedirectToAction(nameof(Detail), new { id });
         }
 
         // POST: /Admin/ForceComplete/{id}
@@ -254,7 +447,7 @@ namespace VehicleSmartBooking.Controllers
                 }
             }
 
-            return RedirectToAction(nameof(Booking), new { id });
+            return RedirectToAction(nameof(Detail), new { id });
         }
 
         // ===== Master Data =====
@@ -423,6 +616,7 @@ namespace VehicleSmartBooking.Controllers
                 DriverNameTH = d.User.UsernameTH,
                 DriverNameEN = d.User.UsernameEN,
                 Phone = d.Phone,
+                CanDriveOutOfProvince = d.CanDriveOutOfProvince,
                 VehicleId = d.VehicleId,
                 IsActive = d.IsActive
             };
@@ -458,6 +652,7 @@ namespace VehicleSmartBooking.Controllers
             d.VehicleId = vm.VehicleId;
             d.IsActive = vm.IsActive;
             d.Phone = string.IsNullOrWhiteSpace(vm.Phone) ? null : vm.Phone.Trim();
+            d.CanDriveOutOfProvince = vm.CanDriveOutOfProvince;
             d.UpdatedAtUtc = DateTime.UtcNow;
 
             await _db.SaveChangesAsync();
@@ -649,6 +844,90 @@ namespace VehicleSmartBooking.Controllers
             public bool HasCredential { get; set; }
         }
 
+        // GET: /Admin/users/create
+        [HttpGet("/Admin/users/create")]
+        public IActionResult CreateUser()
+        {
+            ViewData["ActiveNav"] = "AdminUsers";
+            return View(new CreateUserVm
+            {
+                RoleUser = true,
+                IsActive = true
+            });
+        }
+
+        // POST: /Admin/users/create
+        [HttpPost("/Admin/users/create")]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> CreateUser([FromForm] CreateUserVm vm)
+        {
+            ViewData["ActiveNav"] = "AdminUsers";
+
+            var userCode = (vm.UserCode ?? string.Empty).Trim();
+            var usernameTh = (vm.UsernameTH ?? string.Empty).Trim();
+            var usernameEn = string.IsNullOrWhiteSpace(vm.UsernameEN) ? null : vm.UsernameEN.Trim();
+            var email = string.IsNullOrWhiteSpace(vm.Email) ? null : vm.Email.Trim();
+
+            if (string.IsNullOrWhiteSpace(userCode))
+            {
+                ModelState.AddModelError(nameof(vm.UserCode), "User code is required.");
+            }
+
+            if (string.IsNullOrWhiteSpace(usernameTh))
+            {
+                ModelState.AddModelError(nameof(vm.UsernameTH), "Username TH is required.");
+            }
+
+            var roleFlags = 0;
+            if (vm.RoleUser) roleFlags |= ROLE_USER;
+            if (vm.RoleAdmin) roleFlags |= ROLE_ADMIN;
+            if (vm.RoleApprover) roleFlags |= ROLE_APPROVER;
+
+            if (roleFlags == 0)
+            {
+                ModelState.AddModelError(string.Empty, "At least one role is required.");
+            }
+
+            if (!string.IsNullOrWhiteSpace(userCode) && await _db.Users.AnyAsync(u => u.UserCode == userCode))
+            {
+                ModelState.AddModelError(nameof(vm.UserCode), "This user code already exists.");
+            }
+
+            if (!string.IsNullOrWhiteSpace(email) && await _db.Users.AnyAsync(u => u.Email == email))
+            {
+                ModelState.AddModelError(nameof(vm.Email), "This email already exists.");
+            }
+
+            if (!ModelState.IsValid)
+            {
+                return View(vm);
+            }
+
+            var now = DateTime.UtcNow;
+            var user = new User
+            {
+                UserCode = userCode,
+                UsernameTH = usernameTh,
+                UsernameEN = usernameEn,
+                Email = email,
+                FunctionAbbr = string.IsNullOrWhiteSpace(vm.FunctionAbbr) ? null : vm.FunctionAbbr.Trim(),
+                DeptAbbr = string.IsNullOrWhiteSpace(vm.DeptAbbr) ? null : vm.DeptAbbr.Trim(),
+                DivAbbr = string.IsNullOrWhiteSpace(vm.DivAbbr) ? null : vm.DivAbbr.Trim(),
+                PositionTH = string.IsNullOrWhiteSpace(vm.PositionTH) ? null : vm.PositionTH.Trim(),
+                PositionEN = string.IsNullOrWhiteSpace(vm.PositionEN) ? null : vm.PositionEN.Trim(),
+                RoleFlags = roleFlags,
+                IsActive = vm.IsActive,
+                CreatedAtUtc = now,
+                UpdatedAtUtc = now
+            };
+
+            _db.Users.Add(user);
+            await _db.SaveChangesAsync();
+
+            TempData["Success"] = $"User created: {userCode}";
+            return RedirectToAction(nameof(Users));
+        }
+
         // POST: /Admin/users/reset-password/{id}
         [HttpPost("/Admin/users/reset-password/{id:int}")]
         [ValidateAntiForgeryToken]
@@ -702,6 +981,21 @@ namespace VehicleSmartBooking.Controllers
                 var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
                 var apiUsers = JsonSerializer.Deserialize<List<UsersApi>>(jsonString, options) ?? new List<UsersApi>();
 
+                bool IsApproverPosition(string? positionEn)
+                {
+                    var pos = (positionEn ?? string.Empty).Trim();
+                    if (pos.StartsWith("Acting ", StringComparison.OrdinalIgnoreCase))
+                    {
+                        pos = pos.Substring("Acting ".Length).Trim();
+                    }
+
+                    return pos.Equals("Section Manager", StringComparison.OrdinalIgnoreCase)
+                        || pos.Equals("Division Manager", StringComparison.OrdinalIgnoreCase)
+                        || pos.Equals("Vice President", StringComparison.OrdinalIgnoreCase)
+                        || pos.Equals("Deputy Managing Director", StringComparison.OrdinalIgnoreCase)
+                        || pos.Equals("Managing Director", StringComparison.OrdinalIgnoreCase);
+                }
+
                 var now = DateTime.UtcNow;
                 var apiUserCodes = new HashSet<string>(
                     apiUsers.Select(u => (u.EmployeeID ?? string.Empty).Trim())
@@ -728,6 +1022,7 @@ namespace VehicleSmartBooking.Controllers
                     }
 
                     var nameEn = string.IsNullOrWhiteSpace(item.NameEng) ? null : item.NameEng.Trim();
+                    var shouldBeApprover = IsApproverPosition(item.PositionText100EN);
 
                     if (dbUsersByCode.TryGetValue(userCode, out var user))
                     {
@@ -745,6 +1040,10 @@ namespace VehicleSmartBooking.Controllers
                         user.Email = item.Email;
                         user.PositionTH = item.PositionText100TH;
                         user.PositionEN = item.PositionText100EN;
+                        if (shouldBeApprover && (user.RoleFlags & ROLE_APPROVER) == 0)
+                        {
+                            user.RoleFlags |= ROLE_APPROVER;
+                        }
                         user.IsActive = true;
                         user.UpdatedAtUtc = now;
                     }
@@ -767,7 +1066,7 @@ namespace VehicleSmartBooking.Controllers
                             Email = item.Email,
                             PositionTH = item.PositionText100TH,
                             PositionEN = item.PositionText100EN,
-                            RoleFlags = ROLE_USER,
+                            RoleFlags = ROLE_USER | (shouldBeApprover ? ROLE_APPROVER : 0),
                             IsActive = true,
                             CreatedAtUtc = now,
                             UpdatedAtUtc = now
@@ -781,7 +1080,7 @@ namespace VehicleSmartBooking.Controllers
                     lineManagerUpdates.Add((user, item.LineManagerID?.Trim()));
                 }
 
-                var protectedRoles = ROLE_ADMIN | ROLE_DRIVER | ROLE_APPROVER;
+                var protectedRoles = ROLE_DRIVER;
                 foreach (var user in dbUsers)
                 {
                     if ((user.RoleFlags & protectedRoles) != 0)
@@ -1062,6 +1361,7 @@ namespace VehicleSmartBooking.Controllers
                 UserId = user.UserId,
                 VehicleId = vm.VehicleId,
                 Phone = string.IsNullOrWhiteSpace(vm.Phone) ? null : vm.Phone.Trim(),
+                CanDriveOutOfProvince = vm.CanDriveOutOfProvince,
                 IsActive = true,
                 LastAssignedAtUtc = null,
                 CreatedAtUtc = DateTime.UtcNow,
@@ -1305,6 +1605,8 @@ namespace VehicleSmartBooking.Controllers
 
             public string? Phone { get; set; }
 
+            public bool CanDriveOutOfProvince { get; set; }
+
             [Required]
             public int VehicleId { get; set; }
 
@@ -1325,6 +1627,27 @@ namespace VehicleSmartBooking.Controllers
             public bool IsActive { get; set; } = true;
 
             public string? InitialPassword { get; set; }
+        }
+
+        public class CreateUserVm
+        {
+            [Required]
+            public string? UserCode { get; set; }
+
+            [Required]
+            public string? UsernameTH { get; set; }
+
+            public string? UsernameEN { get; set; }
+            public string? Email { get; set; }
+            public string? FunctionAbbr { get; set; }
+            public string? DeptAbbr { get; set; }
+            public string? DivAbbr { get; set; }
+            public string? PositionTH { get; set; }
+            public string? PositionEN { get; set; }
+            public bool RoleUser { get; set; } = true;
+            public bool RoleAdmin { get; set; }
+            public bool RoleApprover { get; set; }
+            public bool IsActive { get; set; } = true;
         }
 
         // Vehicle VM
@@ -1401,6 +1724,36 @@ namespace VehicleSmartBooking.Controllers
 
             await _db.SaveChangesAsync();
 
+            var adminEmails = await _db.Users
+                .AsNoTracking()
+                .Where(u => (u.RoleFlags & ROLE_ADMIN) != 0 && u.Email != null)
+                .Select(u => u.Email!)
+                .ToListAsync();
+
+            try
+            {
+                await _emailNotifications.NotifyStatusChangedAsync(
+                    booking,
+                    adminEmails,
+                    ownerEmail: null,
+                    statusChangedAtUtc: booking.UpdatedAtUtc,
+                    relativeUrl: $"/Admin/Detail/{booking.BookingId}");
+
+                if (!string.IsNullOrWhiteSpace(booking.Requester?.Email))
+                {
+                    await _emailNotifications.NotifyStatusChangedAsync(
+                        booking,
+                        Array.Empty<string>(),
+                        booking.Requester.Email,
+                        statusChangedAtUtc: booking.UpdatedAtUtc,
+                        relativeUrl: $"/Booking/Detail/{booking.BookingId}");
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to send personal booking status email for booking {BookingId}", booking.BookingId);
+            }
+
             await CreateApprovalsFromLineManagerChainAsync(booking.BookingId, booking.RequesterUserId);
 
             try
@@ -1438,6 +1791,49 @@ namespace VehicleSmartBooking.Controllers
             return RedirectToAction(nameof(Detail), new { id });
         }
 
+        // POST: /Admin/RejectPersonal/{id}
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> RejectPersonal(long id)
+        {
+            var booking = await _db.Bookings
+                .Include(b => b.Requester)
+                .SingleOrDefaultAsync(b => b.BookingId == id);
+
+            if (booking == null) return NotFound();
+
+            if (!booking.IsPersonal || booking.Status != BookingStatus.WaitingAdminPersonal)
+            {
+                TempData["Error"] = "Booking is not waiting for personal vehicle approval.";
+                return RedirectToAction(nameof(Detail), new { id });
+            }
+
+            booking.Status = BookingStatus.Rejected;
+            booking.UpdatedAtUtc = DateTime.UtcNow;
+
+            await _db.SaveChangesAsync();
+
+            if (!string.IsNullOrWhiteSpace(booking.Requester?.Email))
+            {
+                try
+                {
+                    await _emailNotifications.NotifyStatusChangedAsync(
+                        booking,
+                        Array.Empty<string>(),
+                        booking.Requester.Email,
+                        statusChangedAtUtc: booking.UpdatedAtUtc,
+                        relativeUrl: $"/Booking/Detail/{booking.BookingId}");
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Failed to send personal booking reject email for booking {BookingId}", booking.BookingId);
+                }
+            }
+
+            TempData["Success"] = "Personal vehicle request rejected.";
+            return RedirectToAction(nameof(Detail), new { id });
+        }
+
         private async Task CreateApprovalsFromLineManagerChainAsync(long bookingId, int requesterUserId)
         {
             var now = DateTime.UtcNow;
@@ -1445,21 +1841,23 @@ namespace VehicleSmartBooking.Controllers
             var alreadyHasApprovals = await _db.BookingApprovals.AsNoTracking().AnyAsync(a => a.BookingId == bookingId);
             if (alreadyHasApprovals) return;
 
-            var chain = await BuildApprovalChainAsync(requesterUserId);
+            var bookingForApproval = await _db.Bookings
+                .SingleAsync(b => b.BookingId == bookingId);
+
+            var scenario = DetermineApprovalScenario(bookingForApproval);
+            var chain = await _approvalChainBuilder.BuildAsync(requesterUserId, scenario);
             if (chain.IsAutoApproved)
             {
-                var bookingAuto = await _db.Bookings.SingleAsync(b => b.BookingId == bookingId);
-                bookingAuto.Status = bookingAuto.IsExternalRental ? BookingStatus.WaitingAdminVendorConfirm : BookingStatus.WaitingDriverAccept;
-                bookingAuto.UpdatedAtUtc = now;
+                bookingForApproval.Status = GetAutoApprovedStatus(bookingForApproval);
+                bookingForApproval.UpdatedAtUtc = now;
                 await _db.SaveChangesAsync();
                 return;
             }
 
             if (chain.IsAdminActionRequired || chain.Approvers.Count == 0)
             {
-                var booking = await _db.Bookings.SingleAsync(b => b.BookingId == bookingId);
-                booking.Status = BookingStatus.AdminActionRequired;
-                booking.UpdatedAtUtc = now;
+                bookingForApproval.Status = BookingStatus.AdminActionRequired;
+                bookingForApproval.UpdatedAtUtc = now;
                 await _db.SaveChangesAsync();
                 return;
             }
@@ -1478,95 +1876,171 @@ namespace VehicleSmartBooking.Controllers
             await _db.SaveChangesAsync();
         }
 
-        private async Task<ApprovalChainResult> BuildApprovalChainAsync(int requesterUserId)
+        private static ApprovalScenario DetermineApprovalScenario(Booking booking)
         {
-            var requester = await _db.Users.AsNoTracking().SingleAsync(u => u.UserId == requesterUserId);
-
-            ApproverRole GetRole(User? u)
+            if (booking.SpecialOccasionType.HasValue)
             {
-                if (u == null) return ApproverRole.Staff;
-                var pos = (u.PositionEN ?? string.Empty).Trim();
-                if (pos.StartsWith("Acting ", StringComparison.OrdinalIgnoreCase))
-                {
-                    pos = pos.Substring("Acting ".Length).Trim();
-                }
-                if (pos.Equals("Section Manager", StringComparison.OrdinalIgnoreCase)) return ApproverRole.SectionManager;
-                if (pos.Equals("Division Manager", StringComparison.OrdinalIgnoreCase)) return ApproverRole.DM;
-                if (pos.Equals("Vice President", StringComparison.OrdinalIgnoreCase)) return ApproverRole.VP;
-                if (pos.Equals("Deputy Managing Director", StringComparison.OrdinalIgnoreCase)) return ApproverRole.DMD;
-                if (pos.Equals("Managing Director", StringComparison.OrdinalIgnoreCase)) return ApproverRole.MD;
-                return ApproverRole.Staff;
+                return ApprovalScenario.SpecialOccasion;
             }
 
-            async Task<User?> GetManagerAsync(User u)
+            if (booking.IsPersonal)
             {
-                if (!u.LineManagerId.HasValue) return null;
-                return await _db.Users.AsNoTracking().SingleOrDefaultAsync(x => x.UserId == u.LineManagerId.Value);
+                return ApprovalScenario.PersonalVehicle;
             }
 
-            var requesterRole = GetRole(requester);
-            var lm1 = await GetManagerAsync(requester);
-            var lm2 = lm1 != null ? await GetManagerAsync(lm1) : null;
-            var lm3 = lm2 != null ? await GetManagerAsync(lm2) : null;
-            var lm4 = lm3 != null ? await GetManagerAsync(lm3) : null;
-
-            var approvals = new List<ApprovalCandidate>();
-
-            if (requesterRole == ApproverRole.DMD || requesterRole == ApproverRole.MD)
+            if (booking.VehicleTypeRequested == VehicleType.Electric)
             {
-                return new ApprovalChainResult(approvals, IsAutoApproved: true, IsAdminActionRequired: false);
+                var startDate = booking.StartAtUtc.ToLocalTime().Date;
+                var endDate = booking.EndAtUtc.ToLocalTime().Date;
+                return startDate == endDate
+                    ? ApprovalScenario.ElectricSingleDay
+                    : ApprovalScenario.ElectricMultiDay;
             }
 
-            if (requesterRole == ApproverRole.Staff && GetRole(lm1) == ApproverRole.DMD)
+            if (booking.TripType == TripType.OutProvince)
             {
-                approvals.Add(new ApprovalCandidate(lm1!, 1));
-            }
-            else if (requesterRole == ApproverRole.DM)
-            {
-                if (GetRole(lm1) == ApproverRole.VP) approvals.Add(new ApprovalCandidate(lm1!, 1));
-                if (GetRole(lm2) == ApproverRole.DMD) approvals.Add(new ApprovalCandidate(lm2!, 2));
-            }
-            else if (requesterRole == ApproverRole.VP)
-            {
-                if (GetRole(lm1) == ApproverRole.DMD) approvals.Add(new ApprovalCandidate(lm1!, 1));
-            }
-            else
-            {
-                var dm = lm1;
-                var vp = lm2;
-                var dmd = lm3;
-
-                if (GetRole(lm1) == ApproverRole.SectionManager)
-                {
-                    dm = lm2;
-                    vp = lm3;
-                    dmd = lm4;
-                }
-
-                if (GetRole(dm) == ApproverRole.DM) approvals.Add(new ApprovalCandidate(dm!, 1));
-                if (GetRole(vp) == ApproverRole.VP) approvals.Add(new ApprovalCandidate(vp!, 2));
-                if (GetRole(dmd) == ApproverRole.DMD) approvals.Add(new ApprovalCandidate(dmd!, 3));
+                return ApprovalScenario.OutProvinceGeneral;
             }
 
-            if (approvals.Count == 0)
-            {
-                return new ApprovalChainResult(approvals, IsAutoApproved: false, IsAdminActionRequired: true);
-            }
-
-            return new ApprovalChainResult(approvals, IsAutoApproved: false, IsAdminActionRequired: false);
+            return ApprovalScenario.None;
         }
 
-        private sealed record ApprovalCandidate(User User, int LevelNo);
-        private sealed record ApprovalChainResult(List<ApprovalCandidate> Approvers, bool IsAutoApproved, bool IsAdminActionRequired);
-
-        private enum ApproverRole
+        private static BookingStatus GetAutoApprovedStatus(Booking booking)
         {
-            Staff = 0,
-            SectionManager = 1,
-            DM = 2,
-            VP = 3,
-            DMD = 4,
-            MD = 5
+            if (booking.VehicleTypeRequested == VehicleType.Electric)
+            {
+                return BookingStatus.ApprovedSelfDrive;
+            }
+
+            if (booking.IsPersonal)
+            {
+                return BookingStatus.Completed;
+            }
+
+            if (booking.IsExternalRental)
+            {
+                return booking.SpecialOccasionType.HasValue
+                    ? BookingStatus.WaitingAdminVendorQuotation
+                    : BookingStatus.WaitingAdminVendorConfirm;
+            }
+
+            return BookingStatus.WaitingDriverAccept;
         }
+
+        private static (DateTime? StartUtc, DateTime? EndExclusiveUtc) BuildUtcDateRange(DateTime? startDate, DateTime? endDate)
+        {
+            DateTime? startUtc = null;
+            DateTime? endExclusiveUtc = null;
+
+            if (startDate.HasValue)
+            {
+                startUtc = DateTime.SpecifyKind(startDate.Value.Date, DateTimeKind.Local).ToUniversalTime();
+            }
+
+            if (endDate.HasValue)
+            {
+                endExclusiveUtc = DateTime.SpecifyKind(endDate.Value.Date.AddDays(1), DateTimeKind.Local).ToUniversalTime();
+            }
+
+            return (startUtc, endExclusiveUtc);
+        }
+
+        private async Task PopulateBookingFilterOptionsAsync()
+        {
+            var users = _db.Users.AsNoTracking().AsQueryable();
+
+            ViewBag.FunctionOptions = await users
+                .Where(u => u.FunctionAbbr != null && u.FunctionAbbr != "")
+                .Select(u => u.FunctionAbbr!)
+                .Distinct()
+                .OrderBy(x => x)
+                .ToListAsync();
+
+            ViewBag.DeptOptions = await users
+                .Where(u => u.DeptAbbr != null && u.DeptAbbr != "")
+                .Select(u => u.DeptAbbr!)
+                .Distinct()
+                .OrderBy(x => x)
+                .ToListAsync();
+
+            ViewBag.DivOptions = await users
+                .Where(u => u.DivAbbr != null && u.DivAbbr != "")
+                .Select(u => u.DivAbbr!)
+                .Distinct()
+                .OrderBy(x => x)
+                .ToListAsync();
+        }
+
+        private static string BuildDateRangeFileSuffix(DateTime? startDate, DateTime? endDate)
+        {
+            if (startDate.HasValue && endDate.HasValue)
+            {
+                return $"{startDate.Value:yyyyMMdd}-{endDate.Value:yyyyMMdd}";
+            }
+
+            if (startDate.HasValue)
+            {
+                return $"from-{startDate.Value:yyyyMMdd}";
+            }
+
+            if (endDate.HasValue)
+            {
+                return $"until-{endDate.Value:yyyyMMdd}";
+            }
+
+            return DateTime.Today.ToString("yyyyMMdd");
+        }
+
+        private static string GetTripTypeText(TripType tripType) => tripType switch
+        {
+            TripType.InProvince => "ในจังหวัด",
+            TripType.OutProvince => "นอกจังหวัด",
+            _ => tripType.ToString()
+        };
+
+        private static string GetVehicleTypeText(VehicleType vehicleType) => vehicleType switch
+        {
+            VehicleType.Pickup => "รถกระบะ",
+            VehicleType.Van => "รถตู้",
+            VehicleType.Sedan => "รถเก๋ง",
+            VehicleType.Electric => "รถไฟฟ้า",
+            _ => vehicleType.ToString()
+        };
+
+        private static string GetServiceTypeText(Booking booking)
+        {
+            if (booking.IsPersonal)
+            {
+                return "รถส่วนตัว";
+            }
+
+            if (booking.IsExternalRental)
+            {
+                return "รถภายนอกบริษัท";
+            }
+
+            return "รถในบริษัท";
+        }
+
+        private static string GetBookingStatusText(BookingStatus status) => status switch
+        {
+            BookingStatus.Draft => "ร่าง",
+            BookingStatus.Submitted => "ส่งคำขอแล้ว",
+            BookingStatus.WaitingApproval => "รออนุมัติ",
+            BookingStatus.WaitingDriverAccept => "รอพนักงานขับรถตอบรับ",
+            BookingStatus.DriverAccepted => "พนักงานขับรถตอบรับ",
+            BookingStatus.ApprovedSelfDrive => "อนุมัติแล้ว",
+            BookingStatus.WaitingAdminVendorQuotation => "รอเสนอราคาผู้ให้บริการ",
+            BookingStatus.WaitingUserVendorAccept => "รอผู้ขอใช้ยอมรับผู้ให้บริการ",
+            BookingStatus.WaitingAdminVendorConfirm => "รอยืนยันผู้ให้บริการ",
+            BookingStatus.VendorRejectedByUser => "ผู้ขอใช้ปฏิเสธผู้ให้บริการ",
+            BookingStatus.WaitingAdminPersonal => "รอผู้ดูแลอนุมัติรถส่วนตัว",
+            BookingStatus.Completed => "เสร็จสิ้น",
+            BookingStatus.Rated => "ให้คะแนนแล้ว",
+            BookingStatus.Rejected => "ถูกปฏิเสธ",
+            BookingStatus.Cancelled => "ยกเลิก",
+            BookingStatus.AdminActionRequired => "รอผู้ดูแลดำเนินการ",
+            _ => status.ToString()
+        };
     }
 }

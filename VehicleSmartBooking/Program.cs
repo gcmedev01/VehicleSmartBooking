@@ -58,6 +58,7 @@ builder.Services.AddScoped<IPasswordHasher, Pbkdf2PasswordHasher>();
 builder.Services.AddScoped<ICurrentUserService, CurrentUserService>();
 builder.Services.AddScoped<IDriverWorkflowService, DriverWorkflowService>();
 builder.Services.AddScoped<IEmailNotificationService, EmailNotificationService>();
+builder.Services.AddScoped<ApprovalChainBuilder>();
 builder.Services.AddScoped<IDashboardQueryService, DashboardQueryService>();
 
 // IHttpContextAccessor needed for CurrentUserService to read session

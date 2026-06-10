@@ -26,11 +26,11 @@
         const title = document.getElementById('overlayTitle');
         const text = document.getElementById('overlayText');
 
-        if (title) title.textContent = isSignup ? 'Welcome Back!' : 'Hello, Friend!';
+        if (title) title.textContent = isSignup ? 'Reset Password' : 'Let’s Get You Moving';
         if (text) {
             text.textContent = isSignup
-                ? 'Enter your personal details to use all of site features'
-                : 'Register with your personal details to use all of site features';
+                ? 'Provide your username to request a password reset.'
+                : 'Simple and efficient vehicle booking for your work journey.';
         }
         if (overlayBtn) overlayBtn.textContent = isSignup ? 'SIGN IN' : 'SIGN UP';
     }

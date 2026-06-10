@@ -7,9 +7,11 @@
 <section id="sec-booking" class="vb-section is-active">
     <div class="vb-page-head vb-page-hero mb-4">
         <div class="vb-page-title">
-            <div class="vb-page-icon">🚗</div>
+            <div class="vb-page-icon">
+                <img src="~/img/check-list.png" asp-append-version="true" class="vb-page-icon-img" />
+            </div>
             <div>
-                <h1 class="vb-page-h1">Vehicle Service Request</h1>
+                <h1 class="vb-page-h1">Service Request</h1>
                 <div class="vb-page-sub">
                     สร้างคำร้องขอใช้รถ
                 </div>
@@ -38,10 +40,17 @@
     </div>
 
     <!-- ===== Form Wrapper ===== -->
-    <form method="post" enctype="multipart/form-data" class="vb-form" id="vbForm">
+    <form method="post" enctype="multipart/form-data" class="vb-form needs-validation" id="vbForm" novalidate>
         <!-- Hidden to know selected mode -->
         <input type="hidden" name="BookingMode" id="BookingMode" value="in" />
         <input type="hidden" name="ServiceOption" id="ServiceOption" value="" />
+
+        @if (!ViewData.ModelState.IsValid)
+        {
+            <div class="alert alert-danger">
+                @Html.ValidationSummary(excludePropertyErrors: true)
+            </div>
+        }
 
         <!-- Requester -->
         <div class="vb-card p-3 p-md-4 mb-3">
@@ -66,20 +75,24 @@
                     }
                 }
                 <div class="col-12 col-md-3">
-                    <label class="form-label">รหัสพนักงาน</label>
+                    <label class="form-label">รหัสพนักงาน <span class="text-danger">*</span></label>
                     <input type="text" class="form-control" name="EmpCode" value="@((ViewBag.Users?.UserCode as string) ?? string.Empty)" required />
+                    <div class="invalid-feedback">กรุณากรอกรหัสพนักงาน</div>
                 </div>
                 <div class="col-12 col-md-5">
-                    <label class="form-label">ชื่อ-นามสกุล</label>
+                    <label class="form-label">ชื่อ-นามสกุล <span class="text-danger">*</span></label>
                     <input type="text" class="form-control" name="FullName" value="@((ViewBag.Users?.UsernameTH as string) ?? string.Empty)" required />
+                    <div class="invalid-feedback">กรุณากรอกชื่อ-นามสกุล</div>
                 </div>
                 <div class="col-12 col-md-4">
-                    <label class="form-label">หน่วยงาน</label>
+                    <label class="form-label">หน่วยงาน <span class="text-danger">*</span></label>
                     <input type="text" class="form-control" name="Department" value="@(departmentValue ?? string.Empty)" required />
+                    <div class="invalid-feedback">กรุณากรอกหน่วยงาน</div>
                 </div>
                 <div class="col-12 col-md-4">
-                    <label class="form-label">เบอร์โทรติดต่อ</label>
+                    <label class="form-label">เบอร์โทรติดต่อ <span class="text-danger">*</span></label>
                     <input type="tel" class="form-control" name="Phone" value="" required />
+                    <div class="invalid-feedback">กรุณากรอกเบอร์โทรติดต่อ</div>
                 </div>
             </div>
         </div>
@@ -96,10 +109,10 @@
 
             <!-- Vehicle Type with preview -->
             <div class="mb-3">
-                <label class="form-label">ประเภทรถ</label>
+                <label class="form-label">ประเภทรถ <span class="text-danger">*</span></label>
 
                 <div class="row g-3">
-                    <div class="col-12 col-md-4">
+                    <div class="col-12 col-md-3">
                         <input class="btn-check" type="radio" name="VehicleType" id="vehPickup" value="pickup" required>
                         <label class="vb-veh-card" for="vehPickup">
                             <div class="vb-veh-img">
@@ -113,7 +126,7 @@
                         </label>
                     </div>
 
-                    <div class="col-12 col-md-4">
+                    <div class="col-12 col-md-3">
                         <input class="btn-check" type="radio" name="VehicleType" id="vehVan" value="van">
                         <label class="vb-veh-card" for="vehVan">
                             <div class="vb-veh-img">
@@ -127,7 +140,7 @@
                         </label>
                     </div>
 
-                    <div class="col-12 col-md-4">
+                    <div class="col-12 col-md-3">
                         <input class="btn-check" type="radio" name="VehicleType" id="vehSedan" value="sedan">
                         <label class="vb-veh-card" for="vehSedan">
                             <div class="vb-veh-img">
@@ -136,55 +149,92 @@
                                      asp-append-version="true"
                                      alt="รถเก๋ง" />
                             </div>
-                            <div class="vb-veh-name">รถเก๋ง</div>
+                            <div class="vb-veh-name">รถเก๋ง (พร้อมพนักงานขับรถ)</div>
+                            <div class="vb-veh-sub">เหมาะกับงานทั่วไป/พบลูกค้า</div>
+                        </label>
+                    </div>
+
+                    <div class="col-12 col-md-3">
+                        <input class="btn-check" type="radio" name="VehicleType" id="vehElectric" value="electric">
+                        <label class="vb-veh-card" for="vehElectric">
+                            <div class="vb-veh-img">
+                                <img class="vb-veh-img-el"
+                                     src="~/img/electric-car.png"
+                                     asp-append-version="true"
+                                     alt="รถไฟฟ้า" />
+                            </div>
+                            <div class="vb-veh-name">รถไฟฟ้า</div>
                             <div class="vb-veh-sub">เหมาะกับงานทั่วไป/พบลูกค้า</div>
                         </label>
                     </div>
 
                 </div>
+                <div class="text-danger small mt-2 d-none" id="vehicleTypeFeedback">กรุณาเลือกประเภทรถ</div>
             </div>
 
             <div id="vbAvailability" class="alert d-none" role="status"></div>
 
             <div class="row g-3">
                 <div class="col-12 col-md-4">
-                    <label class="form-label">Job No / Cost Center / SO No</label>
-                    <input type="text" class="form-control" name="RefNo" placeholder="เช่น JOB-2026-001" />
+                    <label class="form-label">Job No / Cost Center / SO No <span class="text-danger">*</span></label>
+                    <input type="text" class="form-control" name="RefNo" placeholder="เช่น JOB-2026-001" required />
+                    <div class="invalid-feedback">กรุณากรอกข้อมูลอ้างอิง</div>
                 </div>
 
                 <div class="col-12 col-md-4">
-                    <label class="form-label">วันที่ เวลา เริ่มต้น</label>
+                    <label class="form-label">วันที่ เวลา เริ่มต้น <span class="text-danger">*</span></label>
                     <input type="datetime-local" class="form-control" name="StartAt" required />
+                    <div class="invalid-feedback">กรุณาเลือกวันเวลาเริ่มต้น</div>
                 </div>
 
                 <div class="col-12 col-md-4">
-                    <label class="form-label">วันที่ เวลา สิ้นสุด</label>
+                    <label class="form-label">วันที่ เวลา สิ้นสุด <span class="text-danger">*</span></label>
                     <input type="datetime-local" class="form-control" name="EndAt" required />
+                    <div class="invalid-feedback">กรุณาเลือกวันเวลาสิ้นสุด</div>
                 </div>
 
                 <div class="col-12 col-md-6">
-                    <label class="form-label">จุดรับ</label>
+                    <label class="form-label">จุดรับ <span class="text-danger">*</span></label>
                     <input type="text" class="form-control" name="PickupPoint" placeholder="สถานที่/จุดนัดพบ" required />
+                    <div class="invalid-feedback">กรุณากรอกจุดรับ</div>
                 </div>
 
                 <div class="col-12 col-md-6">
-                    <label class="form-label">ปลายทาง</label>
+                    <label class="form-label">ปลายทาง <span class="text-danger">*</span></label>
                     <input type="text" class="form-control" name="Destination" placeholder="สถานที่ปลายทาง" required />
+                    <div class="invalid-feedback">กรุณากรอกปลายทาง</div>
                 </div>
 
                 <div class="col-12 col-md-6">
-                    <label class="form-label">เพื่อ</label>
+                    <label class="form-label">เพื่อ <span class="text-danger">*</span></label>
                     <input type="text" class="form-control" name="Purpose" placeholder="วัตถุประสงค์การเดินทาง" required />
+                    <div class="invalid-feedback">กรุณากรอกวัตถุประสงค์</div>
                 </div>
 
                 <div class="col-12 col-md-3">
-                    <label class="form-label">จำนวนผู้ร่วมเดินทาง</label>
+                    <label class="form-label">จำนวนผู้ร่วมเดินทาง <span class="text-danger">*</span></label>
                     <input type="number" class="form-control" name="PassengerCount" min="1" value="1" required />
+                    <div class="invalid-feedback">กรุณากรอกจำนวนผู้ร่วมเดินทาง</div>
+                </div>
+                <!-- Special occasion selector (supports both in/out province but only for van) -->
+                <div class="col-12 col-md-6 vb-special-occasion-col">
+                    <label class="form-label">กรณีงานแต่ง/งานบวช</label>
+                    <select class="form-select" name="SpecialOccasionType" id="SpecialOccasionType">
+                        <option value="" selected>-- ไม่ใช่กรณีพิเศษ --</option>
+                        <option value="wedding">งานแต่ง</option>
+                        <option value="ordination">งานบวช</option>
+                    </select>
+                </div>
+
+                <div class="col-12 col-md-6 vb-special-occasion-col">
+                    <label class="form-label">หมายเหตุกรณีพิเศษ</label>
+                    <input type="text" class="form-control" name="SpecialOccasionRemark" id="SpecialOccasionRemark" placeholder="ระบุรายละเอียดเพิ่มเติม (ถ้ามี)" />
                 </div>
 
                 <div class="col-12">
-                    <label class="form-label">รายละเอียดอื่นๆ</label>
-                    <textarea class="form-control" rows="3" name="OtherDetail" placeholder="ระบุข้อมูลเพิ่มเติม เช่น จุดแวะ/ของที่ต้องขน/ข้อจำกัดเวลา"></textarea>
+                    <label class="form-label">รายละเอียดอื่นๆ <span class="text-danger">*</span></label>
+                    <textarea class="form-control" rows="3" name="OtherDetail" placeholder="ระบุข้อมูลเพิ่มเติม เช่น จุดแวะ/ของที่ต้องขน/ข้อจำกัดเวลา" required></textarea>
+                    <div class="invalid-feedback">กรุณากรอกรายละเอียดเพิ่มเติม</div>
                 </div>
 
                 <div class="col-12">
@@ -199,15 +249,15 @@
                 <div class="vb-divider my-3"></div>
 
                 <div class="d-flex align-items-start gap-2 mb-2">
-                    <div class="vb-pill">เฉพาะนอกจังหวัด</div>
+                    <div class="vb-pill">นอกจังหวัด</div>
                     <div class="text-muted small">
-                        เลือกประเภทการเดินทาง และระบบจะแสดงขั้นตอนการอนุมัติ
+                        เลือกประเภทการเดินทางให้เหมาะกับการใช้งาน
                     </div>
                 </div>
 
                 <div class="row g-3">
                     <div class="col-12">
-                        <label class="form-label">ประเภทการเดินทาง</label>
+                        <label class="form-label">ประเภทการเดินทาง <span class="text-danger">*</span></label>
                         <select class="form-select" name="OutTripType" id="OutTripType">
                             <option value="" selected>-- เลือกประเภท --</option>
                             <option value="bkk-rayong-metro">
@@ -216,15 +266,13 @@
                             <option value="other-province">
                                 กรณีเดินทางไปปฏิบัตงานจังหวัดอื่นๆ
                             </option>
-                            <option value="special">
-                                กรณีขอใช้รถกรณีพิเศษ (งานอุปสมบท/งานมงคลสมรส) อนุมัติโดย รองกรรมการผู้จัดการ ตามสายงาน
-                            </option>
                         </select>
+                        <div class="invalid-feedback">กรุณาเลือกประเภทการเดินทาง</div>
                     </div>
                 </div>
 
                 <!-- Approval steps preview -->
-                <div class="vb-approval mt-3">
+                <div class="vb-approval mt-3" id="vbApprovalPreview">
                     <div class="fw-semibold mb-3">ขั้นตอนการอนุมัติ</div>
 
                     @if (ViewBag.ApprovalPreview is IEnumerable<dynamic> preview && preview.Any())
@@ -286,4 +334,32 @@
 
 @section Scripts {
     <script src="~/js/vehicle-booking.create.js" asp-append-version="true"></script>
+    <script>
+        (() => {
+            const form = document.getElementById("vbForm");
+            if (!form) return;
+
+            const vehicleTypeInputs = Array.from(form.querySelectorAll('input[name="VehicleType"]'));
+            const vehicleTypeFeedback = document.getElementById("vehicleTypeFeedback");
+
+            const updateVehicleTypeFeedback = () => {
+                const hasValue = vehicleTypeInputs.some(el => el.checked);
+                if (vehicleTypeFeedback) {
+                    vehicleTypeFeedback.classList.toggle("d-none", hasValue);
+                }
+                vehicleTypeInputs.forEach(el => el.classList.toggle("is-invalid", !hasValue));
+            };
+
+            vehicleTypeInputs.forEach(el => el.addEventListener("change", updateVehicleTypeFeedback));
+
+            form.addEventListener("submit", (event) => {
+                if (!form.checkValidity()) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                }
+                form.classList.add("was-validated");
+                updateVehicleTypeFeedback();
+            }, false);
+        })();
+    </script>
 }

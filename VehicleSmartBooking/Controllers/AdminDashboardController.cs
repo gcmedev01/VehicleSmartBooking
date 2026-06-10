@@ -172,7 +172,7 @@ public sealed class AdminDashboardController : Controller
     [HttpGet("/AdminDashboard/Booking/{id:long}")]
     public async Task<IActionResult> Booking(long id, string? returnUrl)
     {
-        ViewData["ActiveNav"] = "AdminDashboard";
+        ViewData["ActiveNav"] = "Dashboard";
         var booking = await _db.Bookings
             .Include(b => b.Requester)
             .Include(b => b.Approvals)

@@ -10,6 +10,7 @@
     // ---------- UI helpers ----------
     string StatusClass(BookingStatus st) => st switch
     {
+        BookingStatus.ApprovedSelfDrive => "vb-status-approved",
         BookingStatus.Completed => "vb-status-completed",
         BookingStatus.Rated => "vb-status-completed",
 
@@ -26,6 +27,7 @@
         BookingStatus.WaitingApproval => "รออนุมัติ",
         BookingStatus.WaitingDriverAccept => "รอพนักงานขับรถตอบรับ",
         BookingStatus.DriverAccepted => "พนักงานขับรถตอบรับ",
+        BookingStatus.ApprovedSelfDrive => "อนุมัติแล้ว",
         BookingStatus.WaitingAdminVendorQuotation => "รอเสนอราคาผู้ให้บริการ",
         BookingStatus.WaitingUserVendorAccept => "รอผู้ขอใช้ยอมรับผู้ให้บริการ",
         BookingStatus.WaitingAdminVendorConfirm => "รอยืนยันผู้ให้บริการ",
@@ -53,6 +55,7 @@
         VehicleType.Pickup => "รถกระบะ",
         VehicleType.Van => "รถตู้",
         VehicleType.Sedan => "รถเก๋ง",
+        VehicleType.Electric => "รถไฟฟ้า",
         _ => v.ToString()
     };
 
@@ -79,7 +82,9 @@
 
 <div class="vb-page-head vb-page-hero mb-4">
     <div class="vb-page-title">
-        <div class="vb-page-icon">🧾</div>
+        <div class="vb-page-icon">
+            <img src="~/img/task.png" asp-append-version="true" class="vb-page-icon-img" />
+        </div>
         <div>
             <h1 class="vb-page-h1">My Task</h1>
             <div class="vb-page-sub">ค้นหาและติดตามสถานะคำขอของคุณ</div>
@@ -106,6 +111,7 @@
                 <option value="all" selected>ทั้งหมด</option>
                 <option value="company">รถในบริษัท</option>
                 <option value="external">รถภายนอกบริษัท</option>
+                <option value="personal">รถส่วนตัว</option>
             </select>
         </div>
 
@@ -119,6 +125,7 @@
                 <option value="WaitingApproval">รออนุมัติ</option>
                 <option value="WaitingDriverAccept">รอพนักงานขับรถตอบรับ</option>
                 <option value="DriverAccepted">พนักงานขับรถตอบรับ</option>
+                <option value="ApprovedSelfDrive">อนุมัติแล้ว</option>
 
                 <option value="WaitingAdminVendorQuotation">รอเสนอราคาผู้ให้บริการ</option>
                 <option value="WaitingUserVendorAccept">รอผู้ขอใช้ยอมรับผู้ให้บริการ</option>
@@ -201,7 +208,7 @@
 
                         // ✅ dropdown value ต้องตรงกับ enum name
                         var statusKey = b.Status.ToString();
-                        var vehicleKey = b.IsExternalRental ? "external" : "company";
+                        var serviceTypeText = b.IsPersonal ? "personal" : b.IsExternalRental ? "external" : "company";
 
                         var textKey = BuildSearchText(b);
 
@@ -209,7 +216,7 @@
                             data-booking-id="@b.BookingId"
                             data-status="@statusKey"
                             data-date="@dateKey"
-                            data-vehicle="@vehicleKey"
+                            data-vehicle="@serviceTypeText"
                             data-text="@textKey">
                             <td class="fw-semibold">VS-@b.BookingId</td>
 
@@ -219,7 +226,7 @@
                             </td>
 
                             <td>
-                                <div class="fw-semibold">@b.PickupLocation &nbsp;→&nbsp; @b.DestinationLocation</div>
+                                <div class="fw-semibold">@b.PickupLocation &nbsp;&rarr;&nbsp; @b.DestinationLocation</div>
                                 <div class="text-muted small">เพื่อ: @(!string.IsNullOrWhiteSpace(b.Purpose) ? b.Purpose : "-")</div>
                             </td>
 
@@ -272,14 +279,14 @@
             var localEnd = b.EndAtUtc.ToLocalTime();
             var dateKey = localStart.ToString("yyyy-MM-dd");
             var statusKey = b.Status.ToString();
-            var vehicleKey = b.IsExternalRental ? "external" : "company";
+            var serviceTypeText = b.IsPersonal ? "personal" : b.IsExternalRental ? "external" : "company";
             var textKey = BuildSearchText(b);
 
             <div class="vb-history-card vb-card p-3 mb-3 his-row"
                  data-booking-id="@b.BookingId"
                  data-status="@statusKey"
                  data-date="@dateKey"
-                 data-vehicle="@vehicleKey"
+                 data-vehicle="@serviceTypeText"
                  data-text="@textKey">
                 <div class="d-flex justify-content-between align-items-start gap-2">
                     <div class="fw-semibold">VS-@b.BookingId</div>
@@ -287,7 +294,7 @@
                 </div>
 
                 <div class="mt-2">
-                    <div class="fw-semibold">@b.PickupLocation → @b.DestinationLocation</div>
+                    <div class="fw-semibold">@b.PickupLocation &rarr; @b.DestinationLocation</div>
                     <div class="text-muted small">
                         @localStart.ToString("dd/MM/yyyy HH:mm") - @localEnd.ToString("dd/MM/yyyy HH:mm")
                         • @VehicleText(b.VehicleTypeRequested)

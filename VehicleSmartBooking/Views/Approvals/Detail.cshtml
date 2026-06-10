@@ -56,7 +56,15 @@
         VehicleType.Pickup => "รถกระบะ",
         VehicleType.Van => "รถตู้",
         VehicleType.Sedan => "รถเก๋ง",
+        VehicleType.Electric => "รถไฟฟ้า",
         _ => v.ToString()
+    };
+
+    string SpecialOccasionText(SpecialOccasionType t) => t switch
+    {
+        SpecialOccasionType.Wedding => "งานแต่ง",
+        SpecialOccasionType.Ordination => "งานบวช",
+        _ => t.ToString()
     };
 
     string StatusText(BookingStatus st) => st switch
@@ -66,6 +74,7 @@
         BookingStatus.WaitingApproval => "รออนุมัติ",
         BookingStatus.WaitingDriverAccept => "รอพนักงานขับรถตอบรับ",
         BookingStatus.DriverAccepted => "พนักงานขับรถตอบรับ",
+        BookingStatus.ApprovedSelfDrive => "อนุมัติแล้ว",
         BookingStatus.WaitingAdminVendorQuotation => "รอเสนอราคาผู้ให้บริการ",
         BookingStatus.WaitingUserVendorAccept => "รอผู้ขอใช้ยอมรับผู้ให้บริการ",
         BookingStatus.WaitingAdminVendorConfirm => "รอยืนยันผู้ให้บริการ",
@@ -112,7 +121,9 @@
 
     // show assigned vehicle plate / driver name when available
     var vehicleText = Model.AssignedVehicle != null ? Model.AssignedVehicle.PlateNo : (Model.AssignedVehicleId.HasValue ? $"#{Model.AssignedVehicleId}" : "-");
-    var driverText = Model.AssignedDriver != null ? (Model.AssignedDriver.User?.UsernameTH ?? Model.AssignedDriver.User?.UsernameEN ?? $"#{Model.AssignedDriver.DriverId}") : (Model.AssignedDriverId.HasValue ? $"#{Model.AssignedDriverId}" : "-");
+    var driverText = Model.AssignedDriver != null
+        ? (Model.AssignedDriver.User?.UsernameTH ?? Model.AssignedDriver.User?.UsernameEN ?? $"#{Model.AssignedDriver.DriverId}")
+        : Model.AssignedDriverId.HasValue ? $"#{Model.AssignedDriverId}" : "ไม่มีพนักงานขับรถ";
     var driverPhone = !string.IsNullOrWhiteSpace(Model.AssignedDriver?.Phone) ? Model.AssignedDriver.Phone : "-";
 
     var serviceTypeText = Model.IsPersonal
@@ -123,6 +134,7 @@
     var tripTypeText = TripText(Model.TripType);
     var vehicleTypeText = VehicleText(Model.VehicleTypeRequested);
     var statusText = StatusText(Model.Status);
+    var specialOccasionText = Model.SpecialOccasionType.HasValue ? SpecialOccasionText(Model.SpecialOccasionType.Value) : null;
 
     var createdLocal = Model.CreatedAtUtc.ToLocalTime();
 }
@@ -136,7 +148,9 @@ else
     <section id="sec-history" class="vb-section is-active">
         <div class="vb-page-head vb-page-hero mb-4">
             <div class="vb-page-title">
-                <div class="vb-page-icon">🧾</div>
+                <div class="vb-page-icon">
+                    <img src="~/img/task.png" asp-append-version="true" class="vb-page-icon-img" />
+                </div>
                 <div>
                     <h1 class="vb-page-h1">Booking Detail</h1>
                     <div class="vb-page-sub">ข้อมูลการจอง #@Model.BookingId</div>
@@ -185,6 +199,14 @@ else
                         <div class="vb-approver-label">จำนวนผู้โดยสาร</div>
                         <div class="vb-approver-value">@passengers</div>
                     </div>
+
+                    @if (!string.IsNullOrWhiteSpace(specialOccasionText))
+                    {
+                        <div class="vb-approver-row mb-2">
+                            <div class="vb-approver-label">กรณีพิเศษ</div>
+                            <div class="vb-approver-value">@specialOccasionText</div>
+                        </div>
+                    }
 
                     <div class="vb-approver-row">
                         <div class="vb-approver-label">สถานะ</div>

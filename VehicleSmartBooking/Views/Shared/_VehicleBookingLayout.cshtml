@@ -20,7 +20,6 @@
         else if (controller == "approvals" && action == "detail") active = "Approve";
 
         // Admin
-        else if (controller == "admindashboard") active = "AdminDashboard";
         else if (controller == "admin" && action == "worklist") active = "AdminWorklist";
         else if (controller == "admin" && (action == "allbookings" || action == "detail")) active = "AllTasks";
         else if (controller == "admin" && action == "booking") active = "AdminWorklist";
@@ -67,7 +66,7 @@
     string GetInitials(string full)
     {
         if (string.IsNullOrWhiteSpace(full)) return "";
-        var prefixes = new[] { "mr", "mrs", "ms", "dr" };
+        var prefixes = new[] { "mr", "mr.", "mrs", "mrs.", "miss", "miss." };
         var parts = full.Split(' ', StringSplitOptions.RemoveEmptyEntries)
                         .Where(p => !prefixes.Contains(p.TrimEnd('.').ToLowerInvariant()))
                         .ToArray();
@@ -85,7 +84,7 @@
     string GetShortName(string full)
     {
         if (string.IsNullOrWhiteSpace(full)) return "";
-        var prefixes = new[] { "mr", "mrs", "ms", "dr" };
+        var prefixes = new[] { "mr", "mr.", "mrs", "mrs.", "miss", "miss." };
         var parts = full.Split(' ', StringSplitOptions.RemoveEmptyEntries)
                         .Where(p => !prefixes.Contains(p.TrimEnd('.').ToLowerInvariant()))
                         .ToArray();
@@ -146,7 +145,7 @@
         <!-- Sidebar -->
         <aside class="vb-sidebar offcanvas offcanvas-md offcanvas-start" tabindex="-1" id="vbSidebar" aria-labelledby="vbSidebarLabel">
              <div class="vb-sidebar-inner">
-                 <div class="vb-sidebar-header">
+                  <div class="vb-sidebar-header">
                     <div class="vb-brand d-flex align-items-center gap-2">
                         <div class="vb-logo">VB</div>
                         <div>
@@ -208,8 +207,8 @@
                             <div class="vb-nav-label">ADMIN</div>
 
                             <a asp-controller="AdminDashboard" asp-action="Index"
-                               class="vb-nav-item @(active == "AdminDashboard" ? "is-active" : "")"
-                               aria-current="@(active == "AdminDashboard" ? "page" : "")">
+                               class="vb-nav-item @(active == "Dashboard" ? "is-active" : "")"
+                               aria-current="@(active == "Dashboard" ? "page" : "")">
                                 <span class="vb-nav-icon"><i class="bi bi-speedometer2"></i></span>
                                 Dashboard
                             </a>
@@ -288,9 +287,8 @@
                         </form>
                     </div>
                 </div>
-
-            </div>
-        </aside>
+             </div>
+         </aside>
 
         <!-- Main -->
         <main class="vb-main">
@@ -299,6 +297,9 @@
             </div>
         </main>
     </div>
+    <script>
+        window.appBasePath = "@Url.Content("~/")";
+    </script>
     <script src="~/lib/jquery/dist/jquery.min.js"></script>
     <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>

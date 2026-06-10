@@ -6,7 +6,9 @@
 
 <div class="vb-page-head vb-page-hero mb-4">
     <div class="vb-page-title">
-        <div class="vb-page-icon">??</div>
+        <div class="vb-page-icon">
+            <img src="~/img/driver.png" asp-append-version="true" class="vb-page-icon-img" />
+        </div>
         <div>
             <h1 class="vb-page-h1">Edit Driver</h1>
         </div>
@@ -45,6 +47,13 @@
 
             <div class="col-md-6">
                 <div class="form-check mt-3">
+                    <input asp-for="CanDriveOutOfProvince" class="form-check-input" />
+                    <label asp-for="CanDriveOutOfProvince" class="form-check-label">สามารถขับรถออกนอกจังหวัดได้</label>
+                </div>
+            </div>
+
+            <div class="col-md-6">
+                <div class="form-check mt-3">
                     <input asp-for="IsActive" class="form-check-input" />
                     <label class="form-check-label">Is Active</label>
                 </div>
@@ -54,7 +63,7 @@
         <div class="d-flex justify-content-end mt-4 gap-2">
             <a asp-action="Drivers" class="btn btn-light">Cancel</a>
             <button class="btn btn-warning" type="submit" form="resetDriverForm">Reset Password</button>
-            <button class="btn btn-primary">Save</button>
+            <button class="btn btn-ci">Save</button>
         </div>
     </form>
 

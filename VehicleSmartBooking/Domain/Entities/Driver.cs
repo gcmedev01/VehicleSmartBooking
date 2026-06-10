@@ -7,6 +7,7 @@ public sealed class Driver
     public int VehicleId { get; set; }
 
     public string? Phone { get; set; }
+    public bool CanDriveOutOfProvince { get; set; }
 
     public bool IsActive { get; set; } = true;
     public DateTime? LastAssignedAtUtc { get; set; }

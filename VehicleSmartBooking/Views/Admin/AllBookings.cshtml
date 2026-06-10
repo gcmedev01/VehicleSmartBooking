@@ -6,10 +6,14 @@
     Layout = "_VehicleBookingLayout";
     ViewData["Title"] = "All Task";
     ViewData["ActiveNav"] = "AllTasks";
+    var functionOptions = ViewBag.FunctionOptions as IEnumerable<string> ?? Enumerable.Empty<string>();
+    var deptOptions = ViewBag.DeptOptions as IEnumerable<string> ?? Enumerable.Empty<string>();
+    var divOptions = ViewBag.DivOptions as IEnumerable<string> ?? Enumerable.Empty<string>();
 
     // ---------- UI helpers ----------
     string StatusClass(BookingStatus st) => st switch
     {
+        BookingStatus.ApprovedSelfDrive => "vb-status-approved",
         BookingStatus.Completed => "vb-status-completed",
         BookingStatus.Rated => "vb-status-completed",
 
@@ -26,6 +30,7 @@
         BookingStatus.WaitingApproval => "รออนุมัติ",
         BookingStatus.WaitingDriverAccept => "รอพนักงานขับรถตอบรับ",
         BookingStatus.DriverAccepted => "พนักงานขับรถตอบรับ",
+        BookingStatus.ApprovedSelfDrive => "อนุมัติแล้ว",
         BookingStatus.WaitingAdminVendorQuotation => "รอเสนอราคาผู้ให้บริการ",
         BookingStatus.WaitingUserVendorAccept => "รอผู้ขอใช้ยอมรับผู้ให้บริการ",
         BookingStatus.WaitingAdminVendorConfirm => "รอยืนยันผู้ให้บริการ",
@@ -53,8 +58,10 @@
         VehicleType.Pickup => "รถกระบะ",
         VehicleType.Van => "รถตู้",
         VehicleType.Sedan => "รถเก๋ง",
+        VehicleType.Electric => "รถไฟฟ้า",
         _ => v.ToString()
     };
+
 
     // ใช้สำหรับ data-text filter (รวมคำให้ค้นง่าย)
     string BuildSearchText(VehicleBooking.Web.Domain.Entities.Booking b)
@@ -79,7 +86,9 @@
 
 <div class="vb-page-head vb-page-hero mb-4">
     <div class="vb-page-title">
-        <div class="vb-page-icon">🧾</div>
+        <div class="vb-page-icon">
+            <img src="~/img/skills.png" asp-append-version="true" class="vb-page-icon-img" />
+        </div>
         <div>
             <h1 class="vb-page-h1">All Task</h1>
             <div class="vb-page-sub">คำร้องขอทั้งหมด</div>
@@ -93,6 +102,61 @@
 
 <!-- Filters + Stats -->
 <div class="vb-card p-3 p-md-4 mb-3">
+    <form method="get" asp-action="AllBookings" class="row g-3 align-items-end mb-3">
+        <div class="col-12 col-md-3">
+            <label class="form-label">วันที่เริ่มต้น</label>
+            <input type="date" class="form-control" name="startDate" value="@ViewBag.StartDate" />
+        </div>
+
+        <div class="col-12 col-md-3">
+            <label class="form-label">วันที่สิ้นสุด</label>
+            <input type="date" class="form-control" name="endDate" value="@ViewBag.EndDate" />
+        </div>
+
+        <div class="col-12 col-md-2">
+            <label class="form-label">Function Abbr</label>
+            <select class="form-select" name="functionAbbr">
+                <option value="">ทั้งหมด</option>
+                @foreach (var item in functionOptions)
+                {
+                    <option value="@item" selected="@(string.Equals(ViewBag.FunctionAbbr as string, item, StringComparison.Ordinal) ? "selected" : null)">@item</option>
+                }
+            </select>
+        </div>
+
+        <div class="col-12 col-md-2">
+            <label class="form-label">Dept Abbr</label>
+            <select class="form-select" name="deptAbbr">
+                <option value="">ทั้งหมด</option>
+                @foreach (var item in deptOptions)
+                {
+                    <option value="@item" selected="@(string.Equals(ViewBag.DeptAbbr as string, item, StringComparison.Ordinal) ? "selected" : null)">@item</option>
+                }
+            </select>
+        </div>
+
+        <div class="col-12 col-md-2">
+            <label class="form-label">Div Abbr</label>
+            <select class="form-select" name="divAbbr">
+                <option value="">ทั้งหมด</option>
+                @foreach (var item in divOptions)
+                {
+                    <option value="@item" selected="@(string.Equals(ViewBag.DivAbbr as string, item, StringComparison.Ordinal) ? "selected" : null)">@item</option>
+                }
+            </select>
+        </div>
+
+        <div class="col-12 d-grid d-md-flex gap-2">
+            <button type="submit" class="btn btn-primary flex-fill">ค้นหารายงาน</button>
+            <button type="submit"
+                    formaction="@Url.Action("ExportBookingsExcel", "Admin")"
+                    formmethod="get"
+                    class="btn btn-success flex-fill">
+                Export Excel
+            </button>
+        </div>
+    </form>
+
     <div class="row g-3 align-items-end">
         <div class="col-12 col-md-4">
             <label class="form-label">ค้นหา</label>
@@ -106,6 +170,7 @@
                 <option value="all" selected>ทั้งหมด</option>
                 <option value="company">รถในบริษัท</option>
                 <option value="external">รถภายนอกบริษัท</option>
+                <option value="personal">รถส่วนตัว</option>
             </select>
         </div>
 
@@ -119,6 +184,7 @@
                 <option value="WaitingApproval">รออนุมัติ</option>
                 <option value="WaitingDriverAccept">รอพนักงานขับรถตอบรับ</option>
                 <option value="DriverAccepted">พนักงานขับรถตอบรับ</option>
+                <option value="ApprovedSelfDrive">อนุมัติแล้ว</option>
 
                 <option value="WaitingAdminVendorQuotation">รอเสนอราคาผู้ให้บริการ</option>
                 <option value="WaitingUserVendorAccept">รอผู้ขอใช้ยอมรับผู้ให้บริการ</option>
@@ -201,7 +267,7 @@
 
                         // ✅ dropdown value ต้องตรงกับ enum name
                         var statusKey = b.Status.ToString();
-                        var vehicleKey = b.IsExternalRental ? "external" : "company";
+                        var serviceTypeText = b.IsPersonal ? "personal" : b.IsExternalRental ? "external" : "company";
 
                         var textKey = BuildSearchText(b);
 
@@ -209,7 +275,7 @@
                             data-booking-id="@b.BookingId"
                             data-status="@statusKey"
                             data-date="@dateKey"
-                            data-vehicle="@vehicleKey"
+                            data-vehicle="@serviceTypeText"
                             data-text="@textKey">
                             <td class="fw-semibold">VS-@b.BookingId</td>
 
@@ -219,7 +285,7 @@
                             </td>
 
                             <td>
-                                <div class="fw-semibold">@b.PickupLocation &nbsp;→&nbsp; @b.DestinationLocation</div>
+                                <div class="fw-semibold">@b.PickupLocation &nbsp;&rarr;&nbsp; @b.DestinationLocation</div>
                                 <div class="text-muted small">เพื่อ: @(!string.IsNullOrWhiteSpace(b.Purpose) ? b.Purpose : "-")</div>
                             </td>
 
@@ -271,14 +337,14 @@
             var localEnd = b.EndAtUtc.ToLocalTime();
             var dateKey = localStart.ToString("yyyy-MM-dd");
             var statusKey = b.Status.ToString();
-            var vehicleKey = b.IsExternalRental ? "external" : "company";
+            var serviceTypeText = b.IsPersonal ? "personal" : b.IsExternalRental ? "external" : "company";
             var textKey = BuildSearchText(b);
 
             <div class="vb-history-card vb-card p-3 mb-3 his-row"
                  data-booking-id="@b.BookingId"
                  data-status="@statusKey"
                  data-date="@dateKey"
-                 data-vehicle="@vehicleKey"
+                 data-vehicle="@serviceTypeText"
                  data-text="@textKey">
                 <div class="d-flex justify-content-between align-items-start gap-2">
                     <div class="fw-semibold">VS-@b.BookingId</div>
@@ -286,7 +352,7 @@
                 </div>
 
                 <div class="mt-2">
-                    <div class="fw-semibold">@b.PickupLocation → @b.DestinationLocation</div>
+                    <div class="fw-semibold">@b.PickupLocation &rarr; @b.DestinationLocation</div>
                     <div class="text-muted small">
                         @localStart.ToString("dd/MM/yyyy HH:mm") - @localEnd.ToString("dd/MM/yyyy HH:mm")
                         • @VehicleText(b.VehicleTypeRequested)

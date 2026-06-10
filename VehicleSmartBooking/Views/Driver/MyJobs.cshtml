@@ -35,6 +35,7 @@
         VehicleType.Pickup => "รถกระบะ",
         VehicleType.Van => "รถตู้",
         VehicleType.Sedan => "รถเก๋ง",
+        VehicleType.Electric => "รถไฟฟ้า",
         _ => v.ToString()
     };
 
@@ -44,7 +45,9 @@
 
 <div class="vb-page-head vb-page-hero mb-4">
     <div class="vb-page-title">
-        <div class="vb-page-icon">🚗</div>
+        <div class="vb-page-icon">
+            <img src="~/img/vehicle.png" asp-append-version="true" class="vb-page-icon-img" />
+        </div>
         <div>
             <h1 class="vb-page-h1">My Jobs</h1>
             <div class="vb-page-sub">รายการงานที่ถูกมอบหมายให้คุณ</div>
@@ -104,7 +107,7 @@ else
 
                     <div class="mb-2">
                         <div class="text-muted small">เส้นทาง</div>
-                        <div class="fw-semibold">@b.PickupLocation → @b.DestinationLocation</div>
+                        <div class="fw-semibold">@b.PickupLocation &rarr; @b.DestinationLocation</div>
                     </div>
 
                     <div class="row g-2">

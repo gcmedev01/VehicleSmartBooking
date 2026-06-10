@@ -18,7 +18,14 @@
                 <div class="text-muted2 mb-4">Choose how you want to sign in</div>
 
                 <!-- Choice 1: Microsoft -->
-                <a class="choice-card d-flex gap-3 align-items-center text-decoration-none text-dark mb-3" href="/auth/sso/login?returnUrl=@System.Net.WebUtility.UrlEncode(ViewData["ReturnUrl"]?.ToString())">
+                @{
+                    var returnUrl = ViewData["ReturnUrl"]?.ToString();
+                    if (string.IsNullOrWhiteSpace(returnUrl))
+                    {
+                        returnUrl = Context?.Request?.Path + Context?.Request?.QueryString;
+                    }
+                }
+                <a class="choice-card d-flex gap-3 align-items-center text-decoration-none text-dark mb-3" asp-controller="Auth" asp-action="SsoLogin" asp-route-returnUrl="@returnUrl">
                     <div class="choice-icon choice-icon-ms">
                         <svg width="22" height="22" viewBox="0 0 23 23" aria-hidden="true">
                             <rect x="0" y="0" width="10" height="10" fill="#F25022" />
@@ -42,7 +49,7 @@
                     </div>
                     <div class="flex-grow-1">
                         <div class="fw-semibold">Use username &amp; password</div>
-                        <div class="text-muted2 small">Local account</div>
+                        <div class="text-muted2 small">For driver account</div>
                     </div>
                     <div class="text-muted2" id="localChevron">›</div>
                 </button>
@@ -76,37 +83,35 @@
 
                 <!-- Sign up trigger -->
                 <div class="d-flex align-items-center justify-content-between">
-                    <div class="text-muted2 small">Don’t have an account?</div>
-                    <button class="btn btn-outline-dark btn-pill px-4" type="button" id="goSignup">
-                        Sign up
-                    </button>
+                    <div class="text-muted2 small">Forgotten password ?</div>
+                    <button class="btn btn-outline-dark btn-pill px-2 px-sm-4 py-1 py-sm-2 btn-sm" type="button" id="goSignup">Reset Password</button>
                 </div>
             </section>
 
             <!-- RIGHT: Create Account -->
             <section class="pane pane-signup">
-                <h2 class="mb-2">Create Account</h2>
-                <div class="text-muted2 mb-4">Register with your email for local account</div>
+                <h2 class="mb-2">Reset Password</h2>
+                <div class="text-muted2 mb-4">Enter your account details to continue.</div>
 
                 <form asp-controller="Account" asp-action="Register" method="post">
                     @Html.AntiForgeryToken()
 
                     <div class="mb-3">
-                        <label class="form-label small text-muted2">Name</label>
-                        <input name="Name" class="form-control" autocomplete="name" />
+                        <label class="form-label small text-muted2">Username</label>
+                        <input name="Username" class="form-control" autocomplete="username" />
                     </div>
 
                     <div class="mb-3">
-                        <label class="form-label small text-muted2">Email</label>
-                        <input name="Email" type="email" class="form-control" autocomplete="email" />
-                    </div>
-
-                    <div class="mb-3">
-                        <label class="form-label small text-muted2">Password</label>
+                        <label class="form-label small text-muted2">New Password</label>
                         <input name="Password" type="password" class="form-control" autocomplete="new-password" />
                     </div>
 
-                    <button class="btn btn-primary btn-pill px-4" type="submit">Sign Up</button>
+                    <div class="mb-3">
+                        <label class="form-label small text-muted2">Confirm New Password</label>
+                        <input name="Confirmpassword" type="password" class="form-control" autocomplete="confirm-new-password" />
+                    </div>
+
+                    <button class="btn btn-primary btn-pill px-4" type="submit">Reset</button>
                 </form>
 
                 <div class="mt-4">
@@ -120,14 +125,12 @@
         <!-- Overlay (แผงสีโค้ง) -->
         <aside class="overlay">
             <div class="overlay-inner">
-                <h3 id="overlayTitle">Hello, Friend!</h3>
+                <h3 id="overlayTitle">Let’s Get You Moving</h3>
                 <p class="mb-3" id="overlayText">
-                    Register with your personal details to use all of site features
+                    Simple and efficient vehicle booking for your work journey.
                 </p>
 
-                <button class="btn btn-outline-light btn-pill px-4" type="button" id="overlayBtn">
-                    SIGN UP
-                </button>
+                @* <button class="btn btn-outline-light btn-pill px-4" type="button" id="overlayBtn">SIGN UP</button> *@
             </div>
         </aside>
     </div>

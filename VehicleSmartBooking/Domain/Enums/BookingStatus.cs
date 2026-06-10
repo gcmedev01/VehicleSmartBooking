@@ -7,6 +7,7 @@ public enum BookingStatus : int
     WaitingApproval = 10,
     WaitingDriverAccept = 11,
     DriverAccepted = 12,
+    ApprovedSelfDrive = 13,
 
     WaitingAdminVendorQuotation = 20,
     WaitingUserVendorAccept = 21,

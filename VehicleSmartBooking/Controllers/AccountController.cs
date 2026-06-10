@@ -40,7 +40,7 @@ namespace VehicleSmartBooking.Controllers
         public IActionResult Login(string? returnUrl = null)
         {
             ViewData["Title"] = "Sign In";
-            ViewData["ReturnUrl"] = returnUrl;
+            ViewData["ReturnUrl"] = SanitizeReturnUrl(returnUrl);
             return View("~/Views/Login/Index.cshtml");
         }
 
@@ -51,7 +51,8 @@ namespace VehicleSmartBooking.Controllers
         public async Task<IActionResult> Login([FromForm] LoginVm vm, string? returnUrl = null)
         {
             ViewData["Title"] = "Sign In";
-            ViewData["ReturnUrl"] = returnUrl;
+            var safeReturnUrl = SanitizeReturnUrl(returnUrl);
+            ViewData["ReturnUrl"] = safeReturnUrl;
 
             if (!ModelState.IsValid)
                 return View("~/Views/Login/Index.cshtml", vm);
@@ -138,11 +139,11 @@ namespace VehicleSmartBooking.Controllers
             {
                 if (cred.PasswordChangedAtUtc == null)
                 {
-                    return RedirectToAction(nameof(ChangePassword), new { returnUrl });
+                    return RedirectToAction(nameof(ChangePassword), new { returnUrl = safeReturnUrl });
                 }
             }
 
-            return RedirectAfterLogin(user, returnUrl);
+            return RedirectAfterLogin(user, safeReturnUrl);
         }
 
         // GET: /account/change-password
@@ -274,6 +275,27 @@ namespace VehicleSmartBooking.Controllers
                 return null;
 
             return await _db.Users.SingleOrDefaultAsync(u => u.UserCode == userCode && u.IsActive);
+        }
+
+        private string? SanitizeReturnUrl(string? returnUrl)
+        {
+            if (string.IsNullOrWhiteSpace(returnUrl))
+                return null;
+
+            if (!Url.IsLocalUrl(returnUrl))
+                return null;
+
+            var loginPath = Url.Action(nameof(Login), "Account") ?? "/account/login";
+            var returnPath = PathString.FromUriComponent(returnUrl);
+            if (returnPath.Equals(loginPath, StringComparison.OrdinalIgnoreCase))
+                return null;
+
+            if (returnPath.Equals("/", StringComparison.OrdinalIgnoreCase) ||
+                returnPath.Equals("/login", StringComparison.OrdinalIgnoreCase) ||
+                returnPath.Equals("/login/index", StringComparison.OrdinalIgnoreCase))
+                return null;
+
+            return returnUrl;
         }
 
         // ---------------- VMs ----------------

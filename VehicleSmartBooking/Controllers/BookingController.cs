@@ -20,13 +20,15 @@ namespace VehicleSmartBooking.Controllers
         private readonly IWebHostEnvironment _env;
         private readonly ILogger<BookingController> _logger;
         private readonly IEmailNotificationService _emailNotifications;
+        private readonly ApprovalChainBuilder _approvalChainBuilder;
 
-        public BookingController(VehicleBookingDbContext db, IWebHostEnvironment env, ILogger<BookingController> logger, IEmailNotificationService emailNotifications)
+        public BookingController(VehicleBookingDbContext db, IWebHostEnvironment env, ILogger<BookingController> logger, IEmailNotificationService emailNotifications, ApprovalChainBuilder approvalChainBuilder)
         {
             _db = db;
             _env = env;
             _logger = logger;
             _emailNotifications = emailNotifications;
+            _approvalChainBuilder = approvalChainBuilder;
         }
 
         public class BookingFormModel
@@ -54,6 +56,8 @@ namespace VehicleSmartBooking.Controllers
 
             // optional extras
             public string? OutTripType { get; set; }
+            public string? SpecialOccasionType { get; set; }
+            public string? SpecialOccasionRemark { get; set; }
             public string? CostCenter { get; set; }
             public string? SONo { get; set; }
         }
@@ -62,34 +66,7 @@ namespace VehicleSmartBooking.Controllers
         {
             ViewData["ActiveNav"] = "MyRequest";
 
-            // Build approval preview for UI
-            var userCode = User.FindFirstValue(ClaimTypes.NameIdentifier);
-            if (!string.IsNullOrWhiteSpace(userCode))
-            {
-                var requester = _db.Users.AsNoTracking().SingleOrDefault(u => u.UserCode == userCode && u.IsActive);
-                if (requester != null)
-                {
-                    ViewBag.Users = requester;
-                    var preview = BuildApprovalChainAsync(requester.UserId).GetAwaiter().GetResult();
-                    ViewBag.ApprovalPreview = preview.Approvers
-                        .Select(a => new
-                        {
-                            a.LevelNo,
-                            Name = a.User.UsernameTH ?? a.User.UsernameEN ?? a.User.UserCode,
-                            Position = a.User.PositionEN ?? ""
-                        })
-                        .ToList();
-
-                    if (preview.IsAutoApproved)
-                    {
-                        ViewBag.ApprovalPreviewNote = "No approval required for your position.";
-                    }
-                    else if (preview.IsAdminActionRequired)
-                    {
-                        ViewBag.ApprovalPreviewNote = "Approval chain not found. Admin action required.";
-                    }
-                }
-            }
+            PopulateCreateViewDataAsync().GetAwaiter().GetResult();
 
             return View();
         }
@@ -253,11 +230,14 @@ namespace VehicleSmartBooking.Controllers
             {
                 "pickup" => VehicleType.Pickup,
                 "van" => VehicleType.Van,
+                "electric" => VehicleType.Electric,
                 _ => VehicleType.Sedan
             };
 
+            var isElectricVehicle = vehicleType == VehicleType.Electric;
             var usePersonal = string.Equals(model.ServiceOption?.Trim(), "personal", StringComparison.OrdinalIgnoreCase)
                               && tripType == TripType.OutProvince;
+            var specialOccasionType = ParseSpecialOccasionType(model.SpecialOccasionType, tripType);
 
             if (!DateTime.TryParse(model.StartAt, out var startLocal) ||
                 !DateTime.TryParse(model.EndAt, out var endLocal))
@@ -302,6 +282,8 @@ namespace VehicleSmartBooking.Controllers
                     JobNo = model.RefNo,
                     CostCenter = model.CostCenter,
                     SONo = model.SONo,
+                    SpecialOccasionType = specialOccasionType,
+                    SpecialOccasionRemark = string.IsNullOrWhiteSpace(model.SpecialOccasionRemark) ? null : model.SpecialOccasionRemark.Trim(),
                     Status = BookingStatus.Submitted,
                     CreatedAtUtc = now,
                     UpdatedAtUtc = now
@@ -310,10 +292,101 @@ namespace VehicleSmartBooking.Controllers
                 _db.Bookings.Add(booking);
                 await _db.SaveChangesAsync();
 
-                await SaveAttachmentsAsync(booking.BookingId, requester.UserId, Attachments);
+                if (isElectricVehicle)
+                {
+                    var assignedVehicleId = await TryAssignFirstAvailableVehicleWithoutDriverAsync(
+                        booking.BookingId,
+                        vehicleType,
+                        startUtc,
+                        endUtc);
+
+                    if (!assignedVehicleId.HasValue)
+                    {
+                        await tx.RollbackAsync();
+                        ModelState.AddModelError("", "ไม่มีรถไฟฟ้าว่างในช่วงเวลาที่เลือก");
+                        await PopulateCreateViewDataAsync();
+                        return View(model);
+                    }
+
+                    booking.AssignedVehicleId = assignedVehicleId.Value;
+                    booking.AssignedDriverId = null;
+                    booking.IsExternalRental = false;
+                    booking.IsPersonal = false;
+                    booking.Status = BookingStatus.Submitted;
+                    booking.UpdatedAtUtc = now;
+
+                    await SaveAttachmentsAsync(booking.BookingId, requester.UserId, Attachments);
+                    await CreateApprovalsFromLineManagerChainAsync(booking.BookingId, requester.UserId);
+                    await _db.SaveChangesAsync();
+
+                    booking = await _db.Bookings
+                        .Include(b => b.Requester)
+                        .Include(b => b.AssignedVehicle)
+                        .Include(b => b.Approvals)
+                            .ThenInclude(a => a.Approver)
+                        .FirstAsync(b => b.BookingId == booking.BookingId);
+
+                    await tx.CommitAsync();
+
+                    var adminEmailsForElectric = await _db.Users
+                        .AsNoTracking()
+                        .Where(u => (u.RoleFlags & 2) != 0 && u.Email != null)
+                        .Select(u => u.Email!)
+                        .ToListAsync();
+
+                    try
+                    {
+                        await _emailNotifications.NotifyStatusChangedAsync(
+                            booking,
+                            adminEmailsForElectric,
+                            ownerEmail: null,
+                            statusChangedAtUtc: booking.UpdatedAtUtc,
+                            relativeUrl: $"/Admin/Detail/{booking.BookingId}");
+
+                        await _emailNotifications.NotifyStatusChangedAsync(
+                            booking,
+                            Array.Empty<string>(),
+                            requester.Email,
+                            statusChangedAtUtc: booking.UpdatedAtUtc,
+                            relativeUrl: $"/Booking/Detail/{booking.BookingId}");
+
+                        if (booking.Status == BookingStatus.WaitingApproval)
+                        {
+                            var pendingApprovals = booking.Approvals
+                                .Where(a => a.Status == ApprovalStatus.Pending && a.Approver?.Email != null)
+                                .ToList();
+
+                            var nextLevel = pendingApprovals.Count == 0
+                                ? (int?)null
+                                : pendingApprovals.Min(a => a.LevelNo);
+
+                            var approverEmails = pendingApprovals
+                                .Where(a => nextLevel.HasValue && a.LevelNo == nextLevel.Value)
+                                .Select(a => a.Approver.Email!)
+                                .ToList();
+
+                            if (approverEmails.Count > 0)
+                            {
+                                await _emailNotifications.NotifyActionRequiredAsync(
+                                    booking,
+                                    approverEmails,
+                                    "กรุณาอนุมัติใบงาน",
+                                    relativeUrl: $"/Approval/Detail/{booking.BookingId}");
+                            }
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(ex, "Failed to send electric booking email for booking {BookingId}", booking.BookingId);
+                    }
+
+                    return RedirectToAction(nameof(Detail), new { id = booking.BookingId });
+                }
 
                 if (usePersonal)
                 {
+                    await SaveAttachmentsAsync(booking.BookingId, requester.UserId, Attachments);
+
                     booking.Status = BookingStatus.WaitingAdminPersonal;
                     booking.IsPersonal = true;
                     booking.IsExternalRental = false;
@@ -322,15 +395,54 @@ namespace VehicleSmartBooking.Controllers
                     await _db.SaveChangesAsync();
                     await tx.CommitAsync();
 
+                    var personalAdminEmails = await _db.Users
+                        .AsNoTracking()
+                        .Where(u => (u.RoleFlags & 2) != 0 && u.Email != null)
+                        .Select(u => u.Email!)
+                        .ToListAsync();
+
+                    try
+                    {
+                        await _emailNotifications.NotifyStatusChangedAsync(
+                            booking,
+                            personalAdminEmails,
+                            ownerEmail: null,
+                            statusChangedAtUtc: booking.UpdatedAtUtc,
+                            relativeUrl: $"/Admin/Detail/{booking.BookingId}");
+
+                        await _emailNotifications.NotifyActionRequiredAsync(
+                            booking,
+                            personalAdminEmails,
+                            "กรุณาอนุมัติรถส่วนตัว",
+                            relativeUrl: $"/Admin/Detail/{booking.BookingId}");
+
+                        await _emailNotifications.NotifyStatusChangedAsync(
+                            booking,
+                            Array.Empty<string>(),
+                            requester.Email,
+                            statusChangedAtUtc: booking.UpdatedAtUtc,
+                            relativeUrl: $"/Booking/Detail/{booking.BookingId}");
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(ex, "Failed to send personal booking email for booking {BookingId}", booking.BookingId);
+                    }
+
                     return RedirectToAction(nameof(Detail), new { id = booking.BookingId });
                 }
+
+                await SaveAttachmentsAsync(booking.BookingId, requester.UserId, Attachments);
 
                 // attempt assignment but do not let assignment errors prevent booking creation
                 var assignResult = (Assigned: false, VehicleId: (int?)null, DriverId: (int?)null);
                 try
                 {
                     assignResult = await TryAssignFirstAvailableCompanyVehicleAsync(
-                        booking.BookingId, vehicleType, startUtc, endUtc);
+                        booking.BookingId,
+                        vehicleType,
+                        startUtc,
+                        endUtc,
+                        tripType == TripType.OutProvince);
                 }
                 catch (Exception ex)
                 {
@@ -342,8 +454,17 @@ namespace VehicleSmartBooking.Controllers
                 if (!assignResult.Assigned)
                 {
                     // no company vehicle available -> vendor flow
-                    booking.Status = BookingStatus.WaitingAdminVendorQuotation;
                     booking.IsExternalRental = true;
+
+                    if (booking.SpecialOccasionType.HasValue)
+                    {
+                        booking.Status = BookingStatus.Submitted;
+                        await CreateApprovalsFromLineManagerChainAsync(booking.BookingId, requester.UserId);
+                    }
+                    else
+                    {
+                        booking.Status = BookingStatus.WaitingAdminVendorQuotation;
+                    }
                 }
                 else
                 {
@@ -375,24 +496,31 @@ namespace VehicleSmartBooking.Controllers
                             driverToUpdate.LastAssignedAtUtc = DateTime.UtcNow;
                         }
 
-                        if (tripType == TripType.InProvince)
-                        {
-                            booking.Status = BookingStatus.WaitingDriverAccept;
+                    // If this booking is a special occasion, require approvals regardless of in/out province
+                    if (booking.SpecialOccasionType.HasValue)
+                    {
+                        booking.Status = BookingStatus.Submitted;
+                        // create approval rows according to approval scenario (SpecialOccasion)
+                        await CreateApprovalsFromLineManagerChainAsync(booking.BookingId, requester.UserId);
+                    }
+                    else if (tripType == TripType.InProvince)
+                    {
+                        booking.Status = BookingStatus.WaitingDriverAccept;
 
-                            _db.BookingDispatchLogs.Add(new BookingDispatchLog
-                            {
-                                BookingId = booking.BookingId,
-                                AttemptNo = 1,
-                                VehicleId = assignResult.VehicleId!.Value,
-                                DriverId = assignResult.DriverId!.Value,
-                                DispatchedAtUtc = now
-                            });
-                        }
-                        else
+                        _db.BookingDispatchLogs.Add(new BookingDispatchLog
                         {
-                            booking.Status = BookingStatus.WaitingApproval;
-                            await CreateApprovalsFromLineManagerChainAsync(booking.BookingId, requester.UserId);
-                        }
+                            BookingId = booking.BookingId,
+                            AttemptNo = 1,
+                            VehicleId = assignResult.VehicleId!.Value,
+                            DriverId = assignResult.DriverId!.Value,
+                            DispatchedAtUtc = now
+                        });
+                    }
+                    else
+                    {
+                        booking.Status = BookingStatus.Submitted;
+                        await CreateApprovalsFromLineManagerChainAsync(booking.BookingId, requester.UserId);
+                    }
                     }
                 }
 
@@ -422,7 +550,7 @@ namespace VehicleSmartBooking.Controllers
                         statusChangedAtUtc: booking.UpdatedAtUtc,
                         relativeUrl: $"/Booking/Detail/{booking.BookingId}");
 
-                    if (booking.Status == BookingStatus.WaitingApproval && !booking.IsExternalRental)
+                    if (booking.Status == BookingStatus.WaitingApproval)
                     {
                         var pendingApprovals = await _db.BookingApprovals
                             .AsNoTracking()
@@ -461,6 +589,37 @@ namespace VehicleSmartBooking.Controllers
                 await tx.RollbackAsync();
                 throw;
             }
+        }
+
+        private async Task PopulateCreateViewDataAsync()
+        {
+            var userCode = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (string.IsNullOrWhiteSpace(userCode))
+            {
+                return;
+            }
+
+            var requester = await _db.Users.AsNoTracking().SingleOrDefaultAsync(u => u.UserCode == userCode && u.IsActive);
+            if (requester == null)
+            {
+                return;
+            }
+
+            ViewBag.Users = requester;
+
+            var preview = await _approvalChainBuilder.BuildPreviewAsync(requester.UserId);
+            ViewBag.ApprovalPreview = preview
+                .Select(a => new
+                {
+                    a.LevelNo,
+                    Name = a.User.UsernameTH ?? a.User.UsernameEN ?? a.User.UserCode,
+                    Position = a.User.PositionEN ?? ""
+                })
+                .ToList();
+
+            ViewBag.ApprovalPreviewNote = preview.Count == 0
+                ? "เงื่อนไขการอนุมัติขึ้นอยู่กับประเภทคำขอและสายบังคับบัญชา"
+                : null;
         }
 
         private async Task SaveAttachmentsAsync(long bookingId, int uploadedByUserId, List<IFormFile>? files)
@@ -515,21 +674,23 @@ namespace VehicleSmartBooking.Controllers
             var alreadyHasApprovals = await _db.BookingApprovals.AsNoTracking().AnyAsync(a => a.BookingId == bookingId);
             if (alreadyHasApprovals) return;
 
-            var chain = await BuildApprovalChainAsync(requesterUserId);
+            var bookingForApproval = await _db.Bookings
+                .SingleAsync(b => b.BookingId == bookingId);
+
+            var scenario = DetermineApprovalScenario(bookingForApproval);
+            var chain = await _approvalChainBuilder.BuildAsync(requesterUserId, scenario);
             if (chain.IsAutoApproved)
             {
-                var bookingAuto = await _db.Bookings.SingleAsync(b => b.BookingId == bookingId);
-                bookingAuto.Status = bookingAuto.IsExternalRental ? BookingStatus.WaitingAdminVendorConfirm : BookingStatus.WaitingDriverAccept;
-                bookingAuto.UpdatedAtUtc = now;
+                bookingForApproval.Status = GetAutoApprovedStatus(bookingForApproval);
+                bookingForApproval.UpdatedAtUtc = now;
                 await _db.SaveChangesAsync();
                 return;
             }
 
             if (chain.IsAdminActionRequired || chain.Approvers.Count == 0)
             {
-                var booking = await _db.Bookings.SingleAsync(b => b.BookingId == bookingId);
-                booking.Status = BookingStatus.AdminActionRequired;
-                booking.UpdatedAtUtc = now;
+                bookingForApproval.Status = BookingStatus.AdminActionRequired;
+                bookingForApproval.UpdatedAtUtc = now;
                 await _db.SaveChangesAsync();
                 return;
             }
@@ -548,97 +709,115 @@ namespace VehicleSmartBooking.Controllers
             await _db.SaveChangesAsync();
         }
 
-        private async Task<ApprovalChainResult> BuildApprovalChainAsync(int requesterUserId)
+        private static ApprovalScenario DetermineApprovalScenario(Booking booking)
         {
-            var requester = await _db.Users.AsNoTracking().SingleAsync(u => u.UserId == requesterUserId);
-
-            ApproverRole GetRole(User? u)
+            if (booking.SpecialOccasionType.HasValue)
             {
-                if (u == null) return ApproverRole.Staff;
-                var pos = (u.PositionEN ?? string.Empty).Trim();
-                if (pos.StartsWith("Acting ", StringComparison.OrdinalIgnoreCase))
-                {
-                    pos = pos.Substring("Acting ".Length).Trim();
-                }
-                if (pos.Equals("Section Manager", StringComparison.OrdinalIgnoreCase)) return ApproverRole.SectionManager;
-                if (pos.Equals("Division Manager", StringComparison.OrdinalIgnoreCase)) return ApproverRole.DM;
-                if (pos.Equals("Vice President", StringComparison.OrdinalIgnoreCase)) return ApproverRole.VP;
-                if (pos.Equals("Deputy Managing Director", StringComparison.OrdinalIgnoreCase)) return ApproverRole.DMD;
-                if (pos.Equals("Managing Director", StringComparison.OrdinalIgnoreCase)) return ApproverRole.MD;
-                return ApproverRole.Staff;
+                return ApprovalScenario.SpecialOccasion;
             }
 
-            async Task<User?> GetManagerAsync(User u)
+            if (booking.IsPersonal)
             {
-                if (!u.LineManagerId.HasValue) return null;
-                return await _db.Users.AsNoTracking().SingleOrDefaultAsync(x => x.UserId == u.LineManagerId.Value);
+                return ApprovalScenario.PersonalVehicle;
             }
 
-            var requesterRole = GetRole(requester);
-            var lm1 = await GetManagerAsync(requester);
-            var lm2 = lm1 != null ? await GetManagerAsync(lm1) : null;
-            var lm3 = lm2 != null ? await GetManagerAsync(lm2) : null;
-            var lm4 = lm3 != null ? await GetManagerAsync(lm3) : null;
-
-            var approvals = new List<ApprovalCandidate>();
-
-            if (requesterRole == ApproverRole.DMD || requesterRole == ApproverRole.MD)
+            if (booking.VehicleTypeRequested == VehicleType.Electric)
             {
-                return new ApprovalChainResult(approvals, IsAutoApproved: true, IsAdminActionRequired: false);
+                var startDate = booking.StartAtUtc.ToLocalTime().Date;
+                var endDate = booking.EndAtUtc.ToLocalTime().Date;
+                return startDate == endDate
+                    ? ApprovalScenario.ElectricSingleDay
+                    : ApprovalScenario.ElectricMultiDay;
             }
 
-            // secretary case: line manager is DMD
-            if (requesterRole == ApproverRole.Staff && GetRole(lm1) == ApproverRole.DMD)
+            if (booking.TripType == TripType.OutProvince)
             {
-                approvals.Add(new ApprovalCandidate(lm1!, 1));
-            }
-            else if (requesterRole == ApproverRole.DM)
-            {
-                if (GetRole(lm1) == ApproverRole.VP) approvals.Add(new ApprovalCandidate(lm1!, 1));
-                if (GetRole(lm2) == ApproverRole.DMD) approvals.Add(new ApprovalCandidate(lm2!, 2));
-            }
-            else if (requesterRole == ApproverRole.VP)
-            {
-                if (GetRole(lm1) == ApproverRole.DMD) approvals.Add(new ApprovalCandidate(lm1!, 1));
-            }
-            else
-            {
-                // normal staff flow, handle Section Manager between requester and DM
-                var dm = lm1;
-                var vp = lm2;
-                var dmd = lm3;
-
-                if (GetRole(lm1) == ApproverRole.SectionManager)
-                {
-                    dm = lm2;
-                    vp = lm3;
-                    dmd = lm4;
-                }
-
-                if (GetRole(dm) == ApproverRole.DM) approvals.Add(new ApprovalCandidate(dm!, 1));
-                if (GetRole(vp) == ApproverRole.VP) approvals.Add(new ApprovalCandidate(vp!, 2));
-                if (GetRole(dmd) == ApproverRole.DMD) approvals.Add(new ApprovalCandidate(dmd!, 3));
+                return ApprovalScenario.OutProvinceGeneral;
             }
 
-            if (approvals.Count == 0)
-            {
-                return new ApprovalChainResult(approvals, IsAutoApproved: false, IsAdminActionRequired: true);
-            }
-
-            return new ApprovalChainResult(approvals, IsAutoApproved: false, IsAdminActionRequired: false);
+            return ApprovalScenario.None;
         }
 
-        private sealed record ApprovalCandidate(User User, int LevelNo);
-        private sealed record ApprovalChainResult(List<ApprovalCandidate> Approvers, bool IsAutoApproved, bool IsAdminActionRequired);
-
-        private enum ApproverRole
+        private static BookingStatus GetAutoApprovedStatus(Booking booking)
         {
-            Staff = 0,
-            SectionManager = 1,
-            DM = 2,
-            VP = 3,
-            DMD = 4,
-            MD = 5
+            if (booking.VehicleTypeRequested == VehicleType.Electric)
+            {
+                return BookingStatus.ApprovedSelfDrive;
+            }
+
+            if (booking.IsPersonal)
+            {
+                return BookingStatus.Completed;
+            }
+
+            if (booking.IsExternalRental)
+            {
+                return booking.SpecialOccasionType.HasValue
+                    ? BookingStatus.WaitingAdminVendorQuotation
+                    : BookingStatus.WaitingAdminVendorConfirm;
+            }
+
+            return BookingStatus.WaitingDriverAccept;
+        }
+
+        private static SpecialOccasionType? ParseSpecialOccasionType(string? value, TripType tripType)
+        {
+            // Accept special occasion value regardless of trip type. Server-side UI already restricts
+            // selection to vehicle type == van, but enforce here as a pure parser: if value empty -> null.
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return null;
+            }
+
+            return value.Trim().ToLowerInvariant() switch
+            {
+                "wedding" => SpecialOccasionType.Wedding,
+                "ordination" => SpecialOccasionType.Ordination,
+                _ => null
+            };
+        }
+
+        [Authorize]
+        [HttpGet("/booking/preview-approvals")]
+        public async Task<IActionResult> PreviewApprovals([FromQuery] string? bookingMode, [FromQuery] string? vehicleType, [FromQuery] string? specialOccasionType)
+        {
+            var userCode = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (string.IsNullOrWhiteSpace(userCode)) return Json(new { ok = false, message = "Unauthenticated" });
+
+            var requester = await _db.Users.AsNoTracking().SingleOrDefaultAsync(u => u.UserCode == userCode && u.IsActive);
+            if (requester == null) return Json(new { ok = false, message = "Requester not found" });
+
+            var tripType = (bookingMode ?? "").ToLowerInvariant() == "out" ? TripType.OutProvince : TripType.InProvince;
+            var vType = (vehicleType ?? string.Empty).Trim().ToLowerInvariant() switch
+            {
+                "pickup" => VehicleType.Pickup,
+                "van" => VehicleType.Van,
+                "sedan" => VehicleType.Sedan,
+                "electric" => VehicleType.Electric,
+                _ => VehicleType.Sedan
+            };
+
+            var special = ParseSpecialOccasionType(specialOccasionType, tripType);
+
+            var bookingStub = new Booking
+            {
+                TripType = tripType,
+                VehicleTypeRequested = vType,
+                SpecialOccasionType = special,
+                IsPersonal = false
+            };
+
+            var scenario = DetermineApprovalScenario(bookingStub);
+            var chain = await _approvalChainBuilder.BuildAsync(requester.UserId, scenario);
+
+            var approvers = chain.Approvers.Select(a => new
+            {
+                LevelNo = a.LevelNo,
+                Name = a.User.UsernameTH ?? a.User.UsernameEN ?? a.User.UserCode,
+                Position = a.User.PositionEN ?? string.Empty
+            }).ToList();
+
+            return Json(new { ok = true, approvers, isAuto = chain.IsAutoApproved, isAdminActionRequired = chain.IsAdminActionRequired });
         }
 
         public sealed class QueueVm
@@ -667,13 +846,14 @@ namespace VehicleSmartBooking.Controllers
 
         [Authorize]
         [HttpGet("/booking/availability")]
-        public async Task<IActionResult> CheckAvailability([FromQuery] string? vehicleType, [FromQuery] string? startAt, [FromQuery] string? endAt)
+        public async Task<IActionResult> CheckAvailability([FromQuery] string? vehicleType, [FromQuery] string? startAt, [FromQuery] string? endAt, [FromQuery] string? bookingMode)
         {
             var type = (vehicleType ?? string.Empty).Trim().ToLowerInvariant() switch
             {
                 "pickup" => VehicleType.Pickup,
                 "van" => VehicleType.Van,
                 "sedan" => VehicleType.Sedan,
+                "electric" => VehicleType.Electric,
                 _ => (VehicleType?)null
             };
 
@@ -695,11 +875,68 @@ namespace VehicleSmartBooking.Controllers
 
             var startUtc = DateTime.SpecifyKind(startLocal, DateTimeKind.Local).ToUniversalTime();
             var endUtc = DateTime.SpecifyKind(endLocal, DateTimeKind.Local).ToUniversalTime();
+            var isOutProvince = string.Equals(bookingMode, "out", StringComparison.OrdinalIgnoreCase);
+
+            if (type == VehicleType.Electric)
+            {
+                var electricVehicleIds = await _db.Vehicles
+                    .AsNoTracking()
+                    .Where(v => v.IsActive && v.VehicleType == VehicleType.Electric)
+                    .Select(v => v.VehicleId)
+                    .ToListAsync();
+
+                if (electricVehicleIds.Count == 0)
+                {
+                    return Ok(new
+                    {
+                        ok = true,
+                        total = 0,
+                        available = 0,
+                        message = "ไม่พบรถไฟฟ้าในระบบ"
+                    });
+                }
+
+                var electricTerminalStatuses = BookingStatusHelper.TerminalStatuses;
+                var busyVehicleIds = await _db.Bookings
+                    .AsNoTracking()
+                    .Where(b =>
+                        !electricTerminalStatuses.Contains(b.Status) &&
+                        !b.IsExternalRental &&
+                        b.AssignedVehicleId != null &&
+                        electricVehicleIds.Contains(b.AssignedVehicleId.Value) &&
+                        b.StartAtUtc < endUtc &&
+                        startUtc < b.EndAtUtc)
+                    .Select(b => b.AssignedVehicleId!.Value)
+                    .Distinct()
+                    .ToListAsync();
+
+                var electricPendingUnassignedCount = await _db.Bookings
+                    .AsNoTracking()
+                    .Where(b =>
+                        !electricTerminalStatuses.Contains(b.Status) &&
+                        !b.IsExternalRental &&
+                        b.AssignedVehicleId == null &&
+                        b.AssignedDriverId == null &&
+                        b.VehicleTypeRequested == VehicleType.Electric &&
+                        b.StartAtUtc < endUtc &&
+                        startUtc < b.EndAtUtc)
+                    .CountAsync();
+
+                var electricAvailable = electricVehicleIds.Count - busyVehicleIds.Count - electricPendingUnassignedCount;
+
+                return Ok(new
+                {
+                    ok = true,
+                    total = electricVehicleIds.Count,
+                    available = Math.Max(0, electricAvailable)
+                });
+            }
 
             var candidates = await (
                 from d in _db.Drivers.AsNoTracking()
                 join v in _db.Vehicles.AsNoTracking() on d.VehicleId equals v.VehicleId
                 where d.IsActive
+                      && (!isOutProvince || d.CanDriveOutOfProvince)
                       && v.IsActive
                       && v.VehicleType == type.Value
                 select new { d.DriverId, d.VehicleId }
@@ -707,7 +944,15 @@ namespace VehicleSmartBooking.Controllers
 
             if (candidates.Count == 0)
             {
-                return Ok(new { ok = true, total = 0, available = 0 });
+                return Ok(new
+                {
+                    ok = true,
+                    total = 0,
+                    available = 0,
+                    message = isOutProvince
+                        ? "ไม่พบรถพร้อมพนักงานขับรถที่สามารถขับออกนอกจังหวัดได้"
+                        : "ไม่พบรถบริษัทในประเภทรถนี้"
+                });
             }
 
             var vehicleIds = candidates.Select(x => x.VehicleId).ToList();
@@ -751,13 +996,14 @@ namespace VehicleSmartBooking.Controllers
             return Ok(new { ok = true, total = candidates.Count, available });
         }
 
-        private async Task<(bool Assigned, int? VehicleId, int? DriverId)> TryAssignFirstAvailableCompanyVehicleAsync(long bookingId,VehicleType vehicleType,DateTime startUtc,DateTime endUtc)
+        private async Task<(bool Assigned, int? VehicleId, int? DriverId)> TryAssignFirstAvailableCompanyVehicleAsync(long bookingId, VehicleType vehicleType, DateTime startUtc, DateTime endUtc, bool requireOutProvinceDriver = false)
         {
             // 1) candidate: driver active + vehicle active + type ตรง
             var candidates = await (
                 from d in _db.Drivers.AsNoTracking()
                 join v in _db.Vehicles.AsNoTracking() on d.VehicleId equals v.VehicleId
                 where d.IsActive
+                      && (!requireOutProvinceDriver || d.CanDriveOutOfProvince)
                       && v.IsActive
                       && v.VehicleType == vehicleType
                 orderby d.LastAssignedAtUtc, d.DriverId
@@ -789,12 +1035,70 @@ namespace VehicleSmartBooking.Controllers
             return (false, null, null);
         }
 
+        private async Task<int?> TryAssignFirstAvailableVehicleWithoutDriverAsync(long bookingId, VehicleType vehicleType, DateTime startUtc, DateTime endUtc)
+        {
+            var candidates = await _db.Vehicles
+                .AsNoTracking()
+                .Where(v => v.IsActive && v.VehicleType == vehicleType)
+                .OrderBy(v => v.PlateNo)
+                .Select(v => v.VehicleId)
+                .ToListAsync();
+
+            if (candidates.Count == 0)
+            {
+                return null;
+            }
+
+            var terminal = BookingStatusHelper.TerminalStatuses;
+            var availableVehicleIds = new List<int>();
+
+            foreach (var vehicleId in candidates)
+            {
+                var isBusy = await _db.Bookings.AsNoTracking().AnyAsync(b =>
+                    b.BookingId != bookingId &&
+                    !terminal.Contains(b.Status) &&
+                    b.AssignedVehicleId == vehicleId &&
+                    b.StartAtUtc < endUtc &&
+                    startUtc < b.EndAtUtc);
+
+                if (!isBusy)
+                {
+                    availableVehicleIds.Add(vehicleId);
+                }
+            }
+
+            if (availableVehicleIds.Count == 0)
+            {
+                return null;
+            }
+
+            var pendingUnassignedCount = await _db.Bookings.AsNoTracking().CountAsync(b =>
+                b.BookingId != bookingId &&
+                !terminal.Contains(b.Status) &&
+                !b.IsExternalRental &&
+                b.AssignedVehicleId == null &&
+                b.AssignedDriverId == null &&
+                b.VehicleTypeRequested == vehicleType &&
+                b.StartAtUtc < endUtc &&
+                startUtc < b.EndAtUtc);
+
+            if (availableVehicleIds.Count <= pendingUnassignedCount)
+            {
+                return null;
+            }
+
+            return availableVehicleIds[pendingUnassignedCount];
+        }
+
         [Authorize]
         [HttpPost("/booking/accept-vendor/{id:long}")]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> AcceptVendor(long id)
         {
-            var booking = await _db.Bookings.Include(b => b.ExternalRental).SingleOrDefaultAsync(b => b.BookingId == id);
+            var booking = await _db.Bookings
+                .Include(b => b.ExternalRental)
+                .Include(b => b.Requester)
+                .SingleOrDefaultAsync(b => b.BookingId == id);
             if (booking == null) return NotFound();
 
             // only requester can accept vendor
@@ -874,9 +1178,13 @@ namespace VehicleSmartBooking.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> RejectVendor(long id, string? reason)
         {
-            var booking = await _db.Bookings.Include(b => b.ExternalRental).SingleOrDefaultAsync(b => b.BookingId == id);
+            var booking = await _db.Bookings
+                .Include(b => b.ExternalRental)
+                .Include(b => b.Requester)
+                .SingleOrDefaultAsync(b => b.BookingId == id);
             if (booking == null) return NotFound();
 
+            // only requester can reject vendor
             var userCode = User.FindFirstValue(ClaimTypes.NameIdentifier);
             if (string.IsNullOrEmpty(userCode)) return Forbid();
             var user = await _db.Users.AsNoTracking().SingleOrDefaultAsync(u => u.UserCode == userCode && u.IsActive);
@@ -894,6 +1202,33 @@ namespace VehicleSmartBooking.Controllers
             booking.Status = BookingStatus.VendorRejectedByUser;
 
             await _db.SaveChangesAsync();
+
+            var adminEmails = await _db.Users
+                .AsNoTracking()
+                .Where(u => (u.RoleFlags & 2) != 0 && u.Email != null)
+                .Select(u => u.Email!)
+                .ToListAsync();
+
+            try
+            {
+                await _emailNotifications.NotifyStatusChangedAsync(
+                    booking,
+                    adminEmails,
+                    ownerEmail: null,
+                    statusChangedAtUtc: booking.UpdatedAtUtc,
+                    relativeUrl: $"/Admin/Detail/{booking.BookingId}");
+
+                await _emailNotifications.NotifyStatusChangedAsync(
+                    booking,
+                    Array.Empty<string>(),
+                    booking.Requester?.Email,
+                    statusChangedAtUtc: booking.UpdatedAtUtc,
+                    relativeUrl: $"/Booking/Detail/{booking.BookingId}");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to send vendor reject email for booking {BookingId}", booking.BookingId);
+            }
 
             TempData["Success"] = "You rejected the vendor quote.";
             return RedirectToAction(nameof(Detail), new { id });

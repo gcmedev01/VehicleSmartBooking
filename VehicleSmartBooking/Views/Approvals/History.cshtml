@@ -9,6 +9,7 @@
 
     string StatusClass(BookingStatus st) => st switch
     {
+        BookingStatus.ApprovedSelfDrive => "vb-status-approved",
         BookingStatus.Completed => "vb-status-completed",
         BookingStatus.Rated => "vb-status-completed",
         BookingStatus.Rejected => "vb-status-rejected",
@@ -24,6 +25,7 @@
         BookingStatus.WaitingApproval => "รออนุมัติ",
         BookingStatus.WaitingDriverAccept => "รอพนักงานขับรถตอบรับ",
         BookingStatus.DriverAccepted => "พนักงานขับรถตอบรับ",
+        BookingStatus.ApprovedSelfDrive => "อนุมัติแล้ว",
         BookingStatus.WaitingAdminVendorQuotation => "รอเสนอราคาผู้ให้บริการ",
         BookingStatus.WaitingUserVendorAccept => "รอผู้ขอใช้ยอมรับผู้ให้บริการ",
         BookingStatus.WaitingAdminVendorConfirm => "รอยืนยันผู้ให้บริการ",
@@ -39,7 +41,9 @@
 
 <div class="vb-page-head vb-page-hero mb-4">
     <div class="vb-page-title">
-        <div class="vb-page-icon">📜</div>
+        <div class="vb-page-icon">
+            <img src="~/img/journal.png" asp-append-version="true" class="vb-page-icon-img" />
+        </div>
         <div>
             <h1 class="vb-page-h1">Approval History</h1>
             <div class="vb-page-sub">ประวัติการอนุมัติ/ไม่อนุมัติ</div>
@@ -87,7 +91,7 @@
 
                             <td class="text-muted">
                                 <div class="small">@b.PickupLocation</div>
-                                <div class="small">→ @b.DestinationLocation</div>
+                                <div class="small">&rarr; @b.DestinationLocation</div>
                             </td>
 
                             <td>

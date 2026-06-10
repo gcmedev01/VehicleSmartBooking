@@ -23,6 +23,8 @@ public sealed class Booking
     public string? CostCenter { get; set; }
     public string? JobNo { get; set; }
     public string? SONo { get; set; }
+    public SpecialOccasionType? SpecialOccasionType { get; set; }
+    public string? SpecialOccasionRemark { get; set; }
 
     public BookingStatus Status { get; set; } = BookingStatus.Draft;
 
