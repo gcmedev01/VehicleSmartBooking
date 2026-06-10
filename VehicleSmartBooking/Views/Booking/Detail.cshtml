@@ -1,6 +1,15 @@
 ﻿@model VehicleBooking.Web.Domain.Entities.Booking
 @using VehicleBooking.Web.Domain.Enums
 @using System.Globalization
+@{
+    string PhotoGroupLabel(DriverCompletionPhotoGroup g) => g switch
+    {
+        DriverCompletionPhotoGroup.OdometerBeforeAfter => "รูปเลขกิโลเมตรก่อนเริ่ม/หลังให้บริการ",
+        DriverCompletionPhotoGroup.ExteriorCondition   => "รูปสภาพรถและภายนอกรถ",
+        DriverCompletionPhotoGroup.InteriorCondition   => "รูปภาพตรวจสอบสภาพรถภายใน",
+        _ => g.ToString()
+    };
+}
 
 @{
     Layout = "_VehicleBookingLayout";
@@ -130,7 +139,7 @@
 
     <div class="row g-3">
         <!-- ===== Left column ===== -->
-        <div class="col-12 col-md-4">
+        <div class="col-12">
             <!-- Request Info -->
             <div class="vb-card p-3 p-md-4 mb-3">
                 <div class="fw-semibold mb-3">Request Info</div>
@@ -255,7 +264,7 @@
         </div>
 
         <!-- ===== Right column ===== -->
-        <div class="col-12 col-md-8">
+        <div class="col-12">
             <div class="vb-card p-3 p-md-4 mb-3">
                 <div class="d-flex justify-content-between align-items-start">
                     <div>
@@ -372,6 +381,30 @@
                     </a>
                 </div>
             </div>
+
+            @if (Model.CompletionPhotos?.Any() == true)
+            {
+                <div class="vb-card p-3 p-md-4 mb-3">
+                    <div class="fw-semibold mb-3">รูปภาพประกอบการจบงาน</div>
+                    @foreach (var group in ((IEnumerable<DriverCompletionPhotoGroup>)Enum.GetValues(typeof(DriverCompletionPhotoGroup))))
+                    {
+                        var groupPhotos = Model.CompletionPhotos.Where(p => p.PhotoGroup == group).ToList();
+                        if (!groupPhotos.Any()) continue;
+                        <div class="mb-3">
+                            <div class="fw-semibold small mb-2">@PhotoGroupLabel(group)</div>
+                            <div class="d-flex flex-wrap gap-2">
+                                @foreach (var photo in groupPhotos)
+                                {
+                                    <a href="@photo.RelativePath" target="_blank" title="@photo.OriginalFileName">
+                                        <img src="@photo.RelativePath" alt="@photo.OriginalFileName"
+                                             style="height:90px;width:90px;object-fit:cover;border-radius:6px;border:1px solid #dee2e6;" />
+                                    </a>
+                                }
+                            </div>
+                        </div>
+                    }
+                </div>
+            }
         </div>
     </div>
 </section>

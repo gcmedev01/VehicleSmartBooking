@@ -119,6 +119,7 @@ namespace VehicleSmartBooking.Controllers
                 .Include(b => b.AssignedDriver)
                     .ThenInclude(d => d.User)
                 .Include(b => b.AssignedVehicle)
+                .Include(b => b.CompletionPhotos)
                 .FirstOrDefaultAsync(b => b.BookingId == id);
 
             if (booking is null) return NotFound();

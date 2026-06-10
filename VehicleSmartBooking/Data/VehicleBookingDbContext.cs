@@ -20,6 +20,7 @@ public sealed class VehicleBookingDbContext : DbContext
     public DbSet<ExternalRental> ExternalRentals => Set<ExternalRental>();
     public DbSet<DriverRating> DriverRatings => Set<DriverRating>();
     public DbSet<BookingAttachment> BookingAttachments => Set<BookingAttachment>();
+    public DbSet<DriverCompletionPhoto> DriverCompletionPhotos => Set<DriverCompletionPhoto>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -340,6 +341,33 @@ public sealed class VehicleBookingDbContext : DbContext
                 .OnDelete(DeleteBehavior.Restrict);
 
             e.HasIndex(x => x.BookingId).HasDatabaseName("IX_Attachments_Booking");
+        });
+
+        // DRIVER COMPLETION PHOTOS
+        modelBuilder.Entity<DriverCompletionPhoto>(e =>
+        {
+            e.ToTable("DriverCompletionPhotos", "dbo");
+            e.HasKey(x => x.DriverCompletionPhotoId);
+
+            e.Property(x => x.PhotoGroup).HasConversion<int>().IsRequired();
+            e.Property(x => x.OriginalFileName).HasMaxLength(255).IsRequired();
+            e.Property(x => x.StoredFileName).HasMaxLength(255).IsRequired();
+            e.Property(x => x.RelativePath).HasMaxLength(1000).IsRequired();
+            e.Property(x => x.ContentType).HasMaxLength(100);
+            e.Property(x => x.UploadedAtUtc).HasColumnType("datetime2(0)").HasDefaultValueSql("sysutcdatetime()");
+
+            e.HasOne(x => x.Booking)
+                .WithMany(b => b.CompletionPhotos)
+                .HasForeignKey(x => x.BookingId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            e.HasOne<User>()
+                .WithMany()
+                .HasForeignKey(x => x.UploadedByUserId)
+                .IsRequired(false)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            e.HasIndex(x => x.BookingId).HasDatabaseName("IX_DriverCompletionPhotos_Booking");
         });
     }
 }

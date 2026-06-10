@@ -48,4 +48,5 @@ public sealed class Booking
     public ExternalRental? ExternalRental { get; set; }
     public DriverRating? Rating { get; set; }
     public ICollection<BookingAttachment> Attachments { get; set; } = new List<BookingAttachment>();
+    public ICollection<DriverCompletionPhoto> CompletionPhotos { get; set; } = new List<DriverCompletionPhoto>();
 }

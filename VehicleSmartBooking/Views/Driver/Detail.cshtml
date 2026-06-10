@@ -1,6 +1,16 @@
 ﻿@using VehicleBooking.Web.Domain.Entities
 @using VehicleBooking.Web.Domain.Enums
 @model Booking
+@{
+    // photo group labels (Thai)
+    string PhotoGroupLabel(DriverCompletionPhotoGroup g) => g switch
+    {
+        DriverCompletionPhotoGroup.OdometerBeforeAfter => "รูปเลขกิโลเมตรก่อนเริ่ม/หลังให้บริการ",
+        DriverCompletionPhotoGroup.ExteriorCondition   => "รูปสภาพรถและภายนอกรถ",
+        DriverCompletionPhotoGroup.InteriorCondition   => "รูปภาพตรวจสอบสภาพรถภายใน",
+        _ => g.ToString()
+    };
+}
 
 @{
     Layout = "_VehicleBookingLayout";
@@ -84,8 +94,16 @@
     </div>
 </div>
 
+@if (TempData["Error"] is string driverErr && !string.IsNullOrWhiteSpace(driverErr))
+{
+    <div class="alert alert-danger alert-dismissible mb-3" role="alert">
+        @driverErr
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+}
+
 <div class="row g-3">
-    <div class="col-12 col-md-4">
+    <div class="col-12">
         <div class="vb-card p-3 p-md-4 mb-3">
             <div class="fw-semibold mb-3">Request Info</div>
 
@@ -148,7 +166,7 @@
         </div>
     </div>
 
-    <div class="col-12 col-md-8">
+    <div class="col-12">
         <div class="vb-card p-3 p-md-4 mb-3">
             <div class="d-flex justify-content-between align-items-start">
                 <div>
@@ -231,15 +249,18 @@
                 }
                 else if (CanComplete(Model.Status))
                 {
-                    <form asp-controller="Driver" asp-action="Complete" asp-route-id="@Model.BookingId" method="post" class="m-0">
-                        @Html.AntiForgeryToken()
-                        <button type="submit" class="btn btn-success">จบงาน</button>
-                    </form>
+                    <button type="button" class="btn btn-success" data-bs-toggle="collapse" data-bs-target="#completeBox" aria-expanded="false" aria-controls="completeBox">จบงาน</button>
                 }
             </div>
 
             @if (CanAccept(Model.Status))
             {
+                <div class="alert alert-warning mt-3 mb-0" role="alert">
+                    <strong>หมายเหตุ:</strong> เมื่อจบงาน คุณจะต้องอัปโหลดรูปภาพ 3 หมวด ได้แก่
+                    รูปเลขกิโลเมตรก่อนเริ่ม/หลังให้บริการ, รูปสภาพรถและภายนอกรถ และ
+                    รูปภาพตรวจสอบสภาพรถภายใน (หากมีของในรถให้นำออกไว้ห้อง CA แล้วถ่ายรูปไว้เป็นหลักฐาน)
+                </div>
+
                 <div class="collapse mt-3" id="declineBox">
                     <div class="vb-card p-3" style="background:#fff;">
                         <div class="fw-semibold mb-2">เหตุผลที่ปฏิเสธ (ถ้ามี)</div>
@@ -253,6 +274,72 @@
                     </div>
                 </div>
             }
+
+            @if (CanComplete(Model.Status))
+            {
+                <div class="collapse mt-3" id="completeBox">
+                    <div class="vb-card p-3">
+                        <div class="fw-semibold mb-3">อัปโหลดรูปภาพประกอบการจบงาน <span class="text-danger">*</span></div>
+                        <form asp-controller="Driver" asp-action="Complete" asp-route-id="@Model.BookingId"
+                              method="post" enctype="multipart/form-data" class="m-0">
+                            @Html.AntiForgeryToken()
+
+                            <div class="mb-3">
+                                <label class="form-label fw-semibold">
+                                    1. รูปเลขกิโลเมตรก่อนเริ่ม/หลังให้บริการ <span class="text-danger">*</span>
+                                </label>
+                                <input type="file" name="PhotoOdometer" class="form-control"
+                                       accept="image/*" multiple required />
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label fw-semibold">
+                                    2. รูปสภาพรถและภายนอกรถ <span class="text-danger">*</span>
+                                </label>
+                                <input type="file" name="PhotoExterior" class="form-control"
+                                       accept="image/*" multiple required />
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label fw-semibold">
+                                    3. รูปภาพตรวจสอบสภาพรถภายใน (หากมีของในรถให้นำออกมาไว้ห้อง CA แล้วถ่ายรูปไว้เป็นหลักฐาน)
+                                    <span class="text-danger">*</span>
+                                </label>
+                                <input type="file" name="PhotoInterior" class="form-control"
+                                       accept="image/*" multiple required />
+                            </div>
+
+                            <div class="d-flex justify-content-end mt-2">
+                                <button type="submit" class="btn btn-success">ยืนยันจบงาน</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            }
         </div>
     </div>
 </div>
+
+@if (Model.CompletionPhotos?.Any() == true)
+{
+    <div class="vb-card p-3 p-md-4 mt-3">
+        <div class="fw-semibold mb-3">รูปภาพประกอบการจบงาน</div>
+        @foreach (var group in ((IEnumerable<DriverCompletionPhotoGroup>)Enum.GetValues(typeof(DriverCompletionPhotoGroup))))
+        {
+            var groupPhotos = Model.CompletionPhotos.Where(p => p.PhotoGroup == group).ToList();
+            if (!groupPhotos.Any()) continue;
+            <div class="mb-3">
+                <div class="fw-semibold small mb-2">@PhotoGroupLabel(group)</div>
+                <div class="d-flex flex-wrap gap-2">
+                    @foreach (var photo in groupPhotos)
+                    {
+                        <a href="@photo.RelativePath" target="_blank" title="@photo.OriginalFileName">
+                            <img src="@photo.RelativePath" alt="@photo.OriginalFileName"
+                                 style="height:90px;width:90px;object-fit:cover;border-radius:6px;border:1px solid #dee2e6;" />
+                        </a>
+                    }
+                </div>
+            </div>
+        }
+    </div>
+}

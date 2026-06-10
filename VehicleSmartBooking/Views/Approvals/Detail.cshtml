@@ -7,11 +7,20 @@
 @model Booking
 
 @{
+    string PhotoGroupLabel(DriverCompletionPhotoGroup g) => g switch
+    {
+        DriverCompletionPhotoGroup.OdometerBeforeAfter => "รูปเลขกิโลเมตรก่อนเริ่ม/หลังให้บริการ",
+        DriverCompletionPhotoGroup.ExteriorCondition => "รูปสภาพรถและภายนอกรถ",
+        DriverCompletionPhotoGroup.InteriorCondition => "รูปภาพตรวจสอบสภาพรถภายใน",
+        _ => g.ToString()
+    };
+}
+
+@{
     Layout = "_VehicleBookingLayout";
     ViewData["Title"] = $"Booking #{Model?.BookingId}";
     ViewData["ActiveNav"] = "Approve";
 
-    // approvals list (any shape) from controller
     var approvals = (ViewBag.Approvals as IEnumerable<object>) ?? Enumerable.Empty<object>();
 
     var canAct = ViewBag.CanAct as bool? ?? false;
@@ -36,12 +45,6 @@
         if (v is DateTimeOffset dto) return dto.UtcDateTime;
         if (DateTime.TryParse(v.ToString(), out var parsed)) return parsed;
         return null;
-    }
-
-
-    if (Model == null)
-    {
-        return;
     }
 
     string TripText(TripType t) => t switch
@@ -88,6 +91,20 @@
         _ => st.ToString()
     };
 
+    string StatusBadgeClass(BookingStatus st) => st switch
+    {
+        BookingStatus.Completed => "bg-success",
+        BookingStatus.Rated => "bg-success",
+        BookingStatus.Rejected => "bg-danger",
+        BookingStatus.Cancelled => "bg-secondary",
+        BookingStatus.WaitingApproval => "bg-warning text-dark",
+        BookingStatus.WaitingDriverAccept => "bg-warning text-dark",
+        BookingStatus.AdminActionRequired => "bg-warning text-dark",
+        BookingStatus.DriverAccepted => "bg-primary",
+        BookingStatus.ApprovedSelfDrive => "bg-primary",
+        _ => "bg-secondary"
+    };
+
     string ApprovalStatusText(ApprovalStatus st) => st switch
     {
         ApprovalStatus.Pending => "รอดำเนินการ",
@@ -103,8 +120,86 @@
         ApprovalStatus.Rejected => "bg-danger",
         _ => "bg-secondary"
     };
+}
 
-    // ===== Derived values (กัน Razor เพี้ยน) =====
+<style>
+    .vb-detail-label {
+        font-size: .8rem;
+        font-weight: 700;
+        color: rgba(17, 24, 39, .55);
+        margin-bottom: .25rem;
+    }
+
+    .vb-detail-value {
+        font-size: .95rem;
+        font-weight: 600;
+        color: #111827;
+        word-break: break-word;
+    }
+
+        .vb-detail-value.text-muted {
+            font-weight: 500;
+        }
+
+    .vb-section-title {
+        font-weight: 700;
+        color: #111827;
+    }
+
+    .vb-section-subtitle {
+        font-size: .85rem;
+        color: rgba(17, 24, 39, .55);
+    }
+
+    .vb-info-grid {
+        row-gap: 1rem;
+    }
+
+    .vb-completion-photo {
+        width: 96px;
+        height: 96px;
+        object-fit: cover;
+        border-radius: 10px;
+        border: 1px solid #dee2e6;
+        transition: transform .15s ease, box-shadow .15s ease;
+    }
+
+        .vb-completion-photo:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 .5rem 1rem rgba(0, 0, 0, .12);
+        }
+
+    .vb-attachment-link {
+        display: inline-flex;
+        align-items: center;
+        gap: .35rem;
+        padding: .5rem .75rem;
+        border: 1px solid rgba(17, 24, 39, .08);
+        border-radius: 10px;
+        color: #111827;
+        background: rgba(248, 250, 252, .8);
+        text-decoration: none;
+    }
+
+        .vb-attachment-link:hover {
+            background: #f8fafc;
+            color: #0d6efd;
+        }
+
+    @@media (max-width: 767.98px) {
+        .vb-completion-photo {
+            width: 84px;
+            height: 84px;
+        }
+    }
+</style>
+
+@if (Model == null)
+{
+    <div class="alert alert-danger">Booking not found or model is null.</div>
+}
+else
+{
     var requesterName =
         !string.IsNullOrWhiteSpace(Model.Requester?.UsernameTH)
             ? Model.Requester.UsernameTH
@@ -115,36 +210,43 @@
     var requesterCode = Model.Requester?.UserCode ?? "-";
     var requesterPhone = string.IsNullOrWhiteSpace(Model.RequesterPhone) ? "-" : Model.RequesterPhone;
     var passengers = Model.PassengerCount ?? 1;
+
     var jobNo = string.IsNullOrWhiteSpace(Model.JobNo) ? "-" : Model.JobNo;
     var costCenter = string.IsNullOrWhiteSpace(Model.CostCenter) ? "-" : Model.CostCenter;
     var soNo = string.IsNullOrWhiteSpace(Model.SONo) ? "-" : Model.SONo;
 
-    // show assigned vehicle plate / driver name when available
-    var vehicleText = Model.AssignedVehicle != null ? Model.AssignedVehicle.PlateNo : (Model.AssignedVehicleId.HasValue ? $"#{Model.AssignedVehicleId}" : "-");
+    var vehicleText = Model.AssignedVehicle != null
+        ? Model.AssignedVehicle.PlateNo
+        : Model.AssignedVehicleId.HasValue
+            ? $"#{Model.AssignedVehicleId}"
+            : "-";
+
     var driverText = Model.AssignedDriver != null
         ? (Model.AssignedDriver.User?.UsernameTH ?? Model.AssignedDriver.User?.UsernameEN ?? $"#{Model.AssignedDriver.DriverId}")
-        : Model.AssignedDriverId.HasValue ? $"#{Model.AssignedDriverId}" : "ไม่มีพนักงานขับรถ";
-    var driverPhone = !string.IsNullOrWhiteSpace(Model.AssignedDriver?.Phone) ? Model.AssignedDriver.Phone : "-";
+        : Model.AssignedDriverId.HasValue
+            ? $"#{Model.AssignedDriverId}"
+            : "ไม่มีพนักงานขับรถ";
+
+    var driverPhone = !string.IsNullOrWhiteSpace(Model.AssignedDriver?.Phone)
+        ? Model.AssignedDriver.Phone
+        : "-";
 
     var serviceTypeText = Model.IsPersonal
         ? "รถส่วนตัว"
         : Model.IsExternalRental
             ? "ผู้ให้บริการภายนอก"
             : "รถบริษัท";
+
     var tripTypeText = TripText(Model.TripType);
     var vehicleTypeText = VehicleText(Model.VehicleTypeRequested);
     var statusText = StatusText(Model.Status);
-    var specialOccasionText = Model.SpecialOccasionType.HasValue ? SpecialOccasionText(Model.SpecialOccasionType.Value) : null;
+    var statusBadgeClass = StatusBadgeClass(Model.Status);
+    var specialOccasionText = Model.SpecialOccasionType.HasValue
+        ? SpecialOccasionText(Model.SpecialOccasionType.Value)
+        : null;
 
     var createdLocal = Model.CreatedAtUtc.ToLocalTime();
-}
 
-@if (Model == null)
-{
-    <div class="alert alert-danger">Booking not found or model is null.</div>
-}
-else
-{
     <section id="sec-history" class="vb-section is-active">
         <div class="vb-page-head vb-page-hero mb-4">
             <div class="vb-page-title">
@@ -164,202 +266,268 @@ else
         </div>
 
         <div class="row g-3">
-            <!-- LEFT -->
-            <div class="col-12 col-md-4">
-                <!-- Request Info -->
-                <div class="vb-card p-3 p-md-4 mb-3">
-                    <div class="fw-semibold mb-3">Request Info</div>
 
-                    <div class="vb-approver-row mb-2">
-                        <div class="vb-approver-label">ผู้ขอใช้รถ</div>
-                        <div class="vb-approver-value">@requesterName</div>
-                    </div>
-
-                    <div class="vb-approver-row mb-2">
-                        <div class="vb-approver-label">รหัสพนักงาน</div>
-                        <div class="vb-approver-value">@requesterCode</div>
-                    </div>
-
-                    <div class="vb-approver-row mb-2">
-                    <div class="vb-approver-label">เบอร์โทรติดต่อ</div>
-                    <div class="vb-approver-value">@requesterPhone</div>
-                </div>
-
-                <div class="vb-approver-row mb-2">
-                        <div class="vb-approver-label">ประเภทการเดินทาง</div>
-                        <div class="vb-approver-value">@tripTypeText</div>
-                    </div>
-
-                    <div class="vb-approver-row mb-2">
-                        <div class="vb-approver-label">ประเภทรถ</div>
-                        <div class="vb-approver-value">@vehicleTypeText</div>
-                    </div>
-
-                    <div class="vb-approver-row mb-2">
-                        <div class="vb-approver-label">จำนวนผู้โดยสาร</div>
-                        <div class="vb-approver-value">@passengers</div>
-                    </div>
-
-                    @if (!string.IsNullOrWhiteSpace(specialOccasionText))
-                    {
-                        <div class="vb-approver-row mb-2">
-                            <div class="vb-approver-label">กรณีพิเศษ</div>
-                            <div class="vb-approver-value">@specialOccasionText</div>
+            <!-- Request Info -->
+            <div class="col-12">
+                <div class="vb-card p-3 p-md-4">
+                    <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-3">
+                        <div>
+                            <div class="vb-section-title">Request Info</div>
+                            <div class="vb-section-subtitle">ข้อมูลผู้ขอใช้รถและสถานะคำขอ</div>
                         </div>
-                    }
 
-                    <div class="vb-approver-row">
-                        <div class="vb-approver-label">สถานะ</div>
-                        <div class="vb-approver-value">@statusText</div>
+                        <span class="badge @statusBadgeClass">@statusText</span>
+                    </div>
+
+                    <div class="vb-divider my-3"></div>
+
+                    <div class="row g-3 vb-info-grid">
+                        <div class="col-12 col-md-4">
+                            <div class="vb-detail-label">ผู้ขอใช้รถ</div>
+                            <div class="vb-detail-value">@requesterName</div>
+                        </div>
+
+                        <div class="col-12 col-md-4">
+                            <div class="vb-detail-label">รหัสพนักงาน</div>
+                            <div class="vb-detail-value">@requesterCode</div>
+                        </div>
+
+                        <div class="col-12 col-md-4">
+                            <div class="vb-detail-label">เบอร์โทรติดต่อ</div>
+                            <div class="vb-detail-value">@requesterPhone</div>
+                        </div>
+
+                        <div class="col-12 col-md-4">
+                            <div class="vb-detail-label">ประเภทการเดินทาง</div>
+                            <div class="vb-detail-value">@tripTypeText</div>
+                        </div>
+
+                        <div class="col-12 col-md-4">
+                            <div class="vb-detail-label">ประเภทรถ</div>
+                            <div class="vb-detail-value">@vehicleTypeText</div>
+                        </div>
+
+                        <div class="col-12 col-md-4">
+                            <div class="vb-detail-label">จำนวนผู้โดยสาร</div>
+                            <div class="vb-detail-value">@passengers</div>
+                        </div>
+
+                        @if (!string.IsNullOrWhiteSpace(specialOccasionText))
+                        {
+                            <div class="col-12 col-md-4">
+                                <div class="vb-detail-label">กรณีพิเศษ</div>
+                                <div class="vb-detail-value">@specialOccasionText</div>
+                            </div>
+                        }
                     </div>
                 </div>
+            </div>
 
-                <!-- Attachments -->
-                <div class="vb-card p-3 p-md-4 mb-3">
-                    <div class="fw-semibold mb-2">Attachments</div>
+            <!-- Route & Schedule -->
+            <div class="col-12">
+                <div class="vb-card p-3 p-md-4">
+                    <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-3">
+                        <div>
+                            <div class="vb-section-title">Route & Schedule</div>
+                            <div class="vb-section-subtitle">รายละเอียดเส้นทางและวันเวลาเดินทาง</div>
+                        </div>
+
+                        <div class="text-md-end">
+                            <div class="fw-semibold">Booking #@Model.BookingId</div>
+                            <div class="text-muted small">@createdLocal.ToString("dd/MM/yyyy HH:mm")</div>
+                        </div>
+                    </div>
+
+                    <div class="vb-divider my-3"></div>
+
+                    <div class="row g-3 vb-info-grid">
+                        <div class="col-12 col-md-6">
+                            <div class="vb-detail-label">จาก</div>
+                            <div class="vb-detail-value">@Model.PickupLocation</div>
+                        </div>
+
+                        <div class="col-12 col-md-6">
+                            <div class="vb-detail-label">ถึง</div>
+                            <div class="vb-detail-value">@Model.DestinationLocation</div>
+                        </div>
+
+                        <div class="col-12 col-md-6">
+                            <div class="vb-detail-label">เริ่มต้น</div>
+                            <div class="vb-detail-value">@Model.StartAtUtc.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</div>
+                        </div>
+
+                        <div class="col-12 col-md-6">
+                            <div class="vb-detail-label">สิ้นสุด</div>
+                            <div class="vb-detail-value">@Model.EndAtUtc.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Vehicle & Driver -->
+            <div class="col-12">
+                <div class="vb-card p-3 p-md-4">
+                    <div class="mb-3">
+                        <div class="vb-section-title">Vehicle & Driver</div>
+                        <div class="vb-section-subtitle">ข้อมูลรถและพนักงานขับรถ</div>
+                    </div>
+
+                    <div class="vb-divider my-3"></div>
+
+                    <div class="row g-3 vb-info-grid">
+                        <div class="col-12 col-md-4">
+                            <div class="vb-detail-label">ประเภทบริการ</div>
+                            <div class="vb-detail-value">@serviceTypeText</div>
+                        </div>
+
+                        @if (Model.IsExternalRental)
+                        {
+                            <div class="col-12 col-md-4">
+                                <div class="vb-detail-label">ทะเบียนรถ</div>
+                                <div class="vb-detail-value">
+                                    @(string.IsNullOrWhiteSpace(Model.ExternalRental?.RentalPlateNo) ? "-" : Model.ExternalRental.RentalPlateNo)
+                                </div>
+                            </div>
+
+                            <div class="col-12 col-md-4">
+                                <div class="vb-detail-label">รายชื่อพนักงานขับรถ</div>
+                                <div class="vb-detail-value">
+                                    @(string.IsNullOrWhiteSpace(Model.ExternalRental?.RentalDriverName) ? "-" : Model.ExternalRental.RentalDriverName)
+                                </div>
+                            </div>
+
+                            <div class="col-12 col-md-4">
+                                <div class="vb-detail-label">เบอร์โทรพนักงานขับรถ</div>
+                                <div class="vb-detail-value">
+                                    @(string.IsNullOrWhiteSpace(Model.ExternalRental?.RentalDriverPhone) ? "-" : Model.ExternalRental.RentalDriverPhone)
+                                </div>
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="col-12 col-md-4">
+                                <div class="vb-detail-label">ทะเบียนรถ</div>
+                                <div class="vb-detail-value">@vehicleText</div>
+                            </div>
+
+                            <div class="col-12 col-md-4">
+                                <div class="vb-detail-label">รายชื่อพนักงานขับรถ</div>
+                                <div class="vb-detail-value">@driverText</div>
+                            </div>
+
+                            <div class="col-12 col-md-4">
+                                <div class="vb-detail-label">เบอร์โทรพนักงานขับรถ</div>
+                                <div class="vb-detail-value">@driverPhone</div>
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+
+            <!-- Job & Purpose -->
+            <div class="col-12">
+                <div class="vb-card p-3 p-md-4">
+                    <div class="mb-3">
+                        <div class="vb-section-title">Job & Purpose</div>
+                        <div class="vb-section-subtitle">ข้อมูลงาน และวัตถุประสงค์การเดินทาง</div>
+                    </div>
+
+                    <div class="vb-divider my-3"></div>
+
+                    <div class="row g-3 vb-info-grid">
+                        <div class="col-12 col-md-4">
+                            <div class="vb-detail-label">Job No</div>
+                            <div class="vb-detail-value">@jobNo</div>
+                        </div>
+
+                        <div class="col-8">
+                            <div class="vb-detail-label">วัตถุประสงค์</div>
+                            <div class="vb-detail-value text-muted">
+                                @(string.IsNullOrWhiteSpace(Model.Purpose) ? "-" : Model.Purpose)
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Attachments -->
+            <div class="col-12">
+                <div class="vb-card p-3 p-md-4">
+                    <div class="mb-3">
+                        <div class="vb-section-title">Attachments</div>
+                        <div class="vb-section-subtitle">เอกสารแนบประกอบการจอง</div>
+                    </div>
+
+                    <div class="vb-divider my-3"></div>
 
                     @if (Model.Attachments?.Any() == true)
                     {
-                        <ul class="list-unstyled mb-0">
+                        <div class="d-flex flex-wrap gap-2">
                             @foreach (var a in Model.Attachments)
                             {
-                                <li class="mb-1">
-                                    <a href="@a.StoragePath" target="_blank">@a.FileName</a>
-                                </li>
+                                <a href="@a.StoragePath" target="_blank" class="vb-attachment-link">
+                                    <i class="bi bi-paperclip"></i>
+                                    <span>@a.FileName</span>
+                                </a>
                             }
-                        </ul>
+                        </div>
                     }
                     else
                     {
                         <div class="text-muted">ไม่มีเอกสารแนบ</div>
                     }
                 </div>
-
-                @if (external != null)
-                {
-                    <div class="vb-card p-3 p-md-4 mb-3">
-                        <div class="fw-semibold mb-2">Vendor Quote</div>
-                        <div><strong>ผู้ให้บริการ:</strong> @external.VendorName</div>
-                        <div>
-                            <strong>ราคา:</strong>
-                            @(external.QuotedPrice?.ToString("C", new CultureInfo("th-TH")) ?? "-")
-                        </div>
-                        <div><strong>หมายเหตุ:</strong> @(string.IsNullOrWhiteSpace(external.Note) ? "-" : external.Note)</div>
-                    </div>
-                }
             </div>
 
-            <div class="col-12 col-md-8">
-                <div class="vb-card p-3 p-md-4 mb-3">
-                    <div class="d-flex justify-content-between align-items-start">
-                        <div>
-                            <div class="fw-semibold">Route & Schedule</div>
-                            <div class="text-muted small">รายละเอียดการเดินทาง</div>
+            <!-- Vendor Quote -->
+            @if (external != null)
+            {
+                <div class="col-12">
+                    <div class="vb-card p-3 p-md-4">
+                        <div class="mb-3">
+                            <div class="vb-section-title">Vendor Quote</div>
+                            <div class="vb-section-subtitle">ข้อมูลผู้ให้บริการภายนอก</div>
                         </div>
-                        <div class="text-end">
-                            <div class="fw-semibold">Booking #@Model.BookingId</div>
-                            <div class="text-muted small">@createdLocal.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</div>
-                        </div>
-                    </div>
 
-                    <div class="vb-divider my-3"></div>
+                        <div class="vb-divider my-3"></div>
 
-                    <div class="mb-2">
-                        <div class="fw-semibold">จาก</div>
-                        <div class="text-muted">@Model.PickupLocation</div>
-                    </div>
+                        <div class="row g-3 vb-info-grid">
+                            <div class="col-12 col-md-4">
+                                <div class="vb-detail-label">ผู้ให้บริการ</div>
+                                <div class="vb-detail-value">@external.VendorName</div>
+                            </div>
 
-                    <div class="mb-2">
-                        <div class="fw-semibold">ถึง</div>
-                        <div class="text-muted">@Model.DestinationLocation</div>
-                    </div>
-
-                    <div class="row g-2 mt-3">
-                        <div class="col-6">
-                            <div class="fw-semibold">เริ่มต้น</div>
-                            <div class="text-muted">@Model.StartAtUtc.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</div>
-                        </div>
-                        <div class="col-6">
-                            <div class="fw-semibold">สิ้นสุด</div>
-                            <div class="text-muted">@Model.EndAtUtc.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</div>
-                        </div>
-                    </div>
-
-                    <div class="vb-divider my-3"></div>
-
-                    <div class="row g-2">
-                        <div class="col-md-4">
-                            <div class="fw-semibold">Job No / Cost Center / SO No</div>
-                            <div class="text-muted">@jobNo</div>
-                        </div>
-                    </div>
-
-                    <div class="vb-divider my-3"></div>
-
-                    <div class="row g-2">
-                        <div class="col-md-4">
-                            <div class="fw-semibold">ประเภทบริการ</div>
-                            <div class="text-muted">@serviceTypeText</div>
-                        </div>
-                    </div>
-
-                    @if (Model.IsExternalRental)
-                    {
-                        <div class="row g-2">
-                            <div class="col-md-4">
-                                <div class="fw-semibold">ทะเบียนรถ</div>
-                                <div class="text-muted">
-                                    @(string.IsNullOrWhiteSpace(Model.ExternalRental?.RentalPlateNo) ? "-" : Model.ExternalRental.RentalPlateNo)
+                            <div class="col-12 col-md-4">
+                                <div class="vb-detail-label">ราคา</div>
+                                <div class="vb-detail-value">
+                                    @(external.QuotedPrice?.ToString("C", new CultureInfo("th-TH")) ?? "-")
                                 </div>
                             </div>
 
-                            <div class="col-md-4">
-                                <div class="fw-semibold">รายชื่อพนักงานขับรถ</div>
-                                <div class="text-muted">
-                                    @(string.IsNullOrWhiteSpace(Model.ExternalRental?.RentalDriverName) ? "-" : Model.ExternalRental.RentalDriverName)
-                                </div>
-                            </div>
-
-                            <div class="col-md-4">
-                                <div class="fw-semibold">เบอร์โทรพนักงานขับรถ</div>
-                                <div class="text-muted">
-                                    @(string.IsNullOrWhiteSpace(Model.ExternalRental?.RentalDriverPhone) ? "-" : Model.ExternalRental.RentalDriverPhone)
+                            <div class="col-12 col-md-4">
+                                <div class="vb-detail-label">หมายเหตุ</div>
+                                <div class="vb-detail-value">
+                                    @(string.IsNullOrWhiteSpace(external.Note) ? "-" : external.Note)
                                 </div>
                             </div>
                         </div>
-                    }
-                    else
-                    {
-                        <div class="row g-2">
-                            <div class="col-md-4">
-                                <div class="fw-semibold">ทะเบียนรถ</div>
-                                <div class="text-muted">@vehicleText</div>
-                            </div>
-                            <div class="col-md-4">
-                                <div class="fw-semibold">รายชื่อพนักงานขับรถ</div>
-                                <div class="text-muted">@driverText</div>
-                            </div>
-                            <div class="col-md-4">
-                                <div class="fw-semibold">เบอร์โทรพนักงานขับรถ</div>
-                                <div class="text-muted">@driverPhone</div>
-                            </div>
-                        </div>
-                    }
-
-                    <div class="vb-divider my-3"></div>
-
-                    <div>
-                        <div class="fw-semibold">วัตถุประสงค์</div>
-                        <div class="text-muted">@Model.Purpose</div>
                     </div>
                 </div>
+            }
 
-                <div class="vb-card p-3 p-md-4 mb-3">
-                    <div class="fw-semibold mb-2">Approval Steps</div>
+            <!-- Approval Steps -->
+            <div class="col-12">
+                <div class="vb-card p-3 p-md-4">
+                    <div class="mb-3">
+                        <div class="vb-section-title">Approval Steps</div>
+                        <div class="vb-section-subtitle">ลำดับการอนุมัติของรายการจองนี้</div>
+                    </div>
 
-                    @if (!approvals.Any())
+                    <div class="vb-divider my-3"></div>
+
+                    @if (Model.Approvals?.Any() != true)
                     {
-                        <div class="text-muted">ยังไม่มีข้อมูล approval steps (ให้ controller ใส่ ViewBag.Approvals)</div>
+                        <div class="text-muted">ยังไม่มีข้อมูล approval steps</div>
                     }
                     else
                     {
@@ -368,10 +536,10 @@ else
                                 <thead>
                                     <tr class="text-muted text-center small">
                                         <th>Level</th>
-                                        <th>Approver</th>
+                                        <th class="text-start">Approver</th>
                                         <th>Status</th>
                                         <th>Action Time</th>
-                                        <th>Comment</th>
+                                        <th class="text-start">Comment</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -385,9 +553,13 @@ else
                                         <tr>
                                             <td class="fw-semibold text-center">@a.LevelNo</td>
                                             <td>@approverName</td>
-                                            <td class="text-center"><span class="badge @approvalBadgeClass ms-2">@approvalStatusText</span></td>
+                                            <td class="text-center">
+                                                <span class="badge @approvalBadgeClass">@approvalStatusText</span>
+                                            </td>
                                             <td class="text-center text-muted">@actionAt</td>
-                                            <td class="text-muted">@a.Comment</td>
+                                            <td class="text-muted">
+                                                @(string.IsNullOrWhiteSpace(a.Comment) ? "-" : a.Comment)
+                                            </td>
                                         </tr>
                                     }
                                 </tbody>
@@ -395,38 +567,103 @@ else
                         </div>
                     }
                 </div>
+            </div>
 
-                <!-- Approve / Reject -->
+            <!-- Completion Photos -->
+            @if (Model.CompletionPhotos?.Any() == true)
+            {
+                <div class="col-12">
+                    <div class="vb-card p-3 p-md-4">
+                        <div class="mb-3">
+                            <div class="vb-section-title">รูปภาพประกอบการจบงาน</div>
+                            <div class="vb-section-subtitle">รูปภาพที่พนักงานขับรถแนบหลังให้บริการ</div>
+                        </div>
+
+                        <div class="vb-divider my-3"></div>
+
+                        @foreach (var group in ((IEnumerable<DriverCompletionPhotoGroup>)Enum.GetValues(typeof(DriverCompletionPhotoGroup))))
+                        {
+                            var groupPhotos = Model.CompletionPhotos.Where(p => p.PhotoGroup == group).ToList();
+
+                            if (!groupPhotos.Any())
+                            {
+                                continue;
+                            }
+
+                            <div class="mb-4">
+                                <div class="fw-semibold small mb-2">@PhotoGroupLabel(group)</div>
+
+                                <div class="d-flex flex-wrap gap-2">
+                                    @foreach (var photo in groupPhotos)
+                                    {
+                                        <a href="@photo.RelativePath" target="_blank" title="@photo.OriginalFileName">
+                                            <img src="@photo.RelativePath"
+                                                 alt="@photo.OriginalFileName"
+                                                 class="vb-completion-photo" />
+                                        </a>
+                                    }
+                                </div>
+                            </div>
+                        }
+                    </div>
+                </div>
+            }
+
+            <!-- Your Decision -->
+            <div class="col-12">
                 <div class="vb-card p-3 p-md-4">
-                    <div class="fw-semibold mb-2">Your Decision</div>
+                    <div class="mb-3">
+                        <div class="vb-section-title">Your Decision</div>
+                        <div class="vb-section-subtitle">ดำเนินการอนุมัติหรือไม่อนุมัติรายการนี้</div>
+                    </div>
+
+                    <div class="vb-divider my-3"></div>
 
                     @if (!hasApprovalRow)
                     {
-                        <div class="alert alert-warning">You are not an approver for this booking.</div>
+                        <div class="alert alert-warning mb-0">
+                            You are not an approver for this booking.
+                        </div>
                     }
                     else if (!canAct)
                     {
-                        <div class="alert alert-info">You cannot act on this booking. Current approval status: <strong>@myApprovalStatus</strong> and booking status: <strong>@Model.Status</strong>.</div>
+                        <div class="alert alert-info mb-0">
+                            You cannot act on this booking.
+                            Current approval status: <strong>@myApprovalStatus</strong>
+                            and booking status: <strong>@Model.Status</strong>.
+                        </div>
                     }
                     else
                     {
                         <form asp-action="Approve" asp-route-bookingId="@Model.BookingId" method="post" class="mb-3">
                             @Html.AntiForgeryToken()
+
                             <label class="form-label">ความคิดเห็น (ถ้ามี)</label>
-                            <textarea name="comment" class="form-control" rows="2" placeholder="ใส่หมายเหตุถ้ามี"></textarea>
+                            <textarea name="comment"
+                              class="form-control"
+                              rows="2"
+                              placeholder="ใส่หมายเหตุถ้ามี"></textarea>
 
                             <div class="d-flex justify-content-end gap-2 mt-3">
-                                <a asp-action="Pending" class="btn btn-light">Back</a>
                                 <button type="submit" class="btn btn-success">
                                     <i class="bi bi-check2-circle me-1"></i> Approve
                                 </button>
                             </div>
                         </form>
 
+                        <div class="vb-divider my-3"></div>
+
                         <form asp-action="Reject" asp-route-bookingId="@Model.BookingId" method="post">
                             @Html.AntiForgeryToken()
-                            <label class="form-label">เหตุผลที่ไม่อนุมัติ <span class="text-danger">*</span></label>
-                            <textarea name="comment" class="form-control" rows="2" placeholder="ต้องระบุเหตุผล" required></textarea>
+
+                            <label class="form-label">
+                                เหตุผลที่ไม่อนุมัติ <span class="text-danger">*</span>
+                            </label>
+                            <textarea name="comment"
+                              class="form-control"
+                              rows="2"
+                              placeholder="ต้องระบุเหตุผล"
+                              required></textarea>
 
                             <div class="d-flex justify-content-end gap-2 mt-3">
                                 <button type="submit" class="btn btn-outline-danger">
@@ -435,7 +672,9 @@ else
                             </div>
                         </form>
                     }
+
                     <div class="vb-divider my-3"></div>
+
                     <div class="d-flex justify-content-end">
                         <a asp-action="Pending" class="btn btn-light">
                             Back
@@ -443,6 +682,7 @@ else
                     </div>
                 </div>
             </div>
+
         </div>
     </section>
 }
