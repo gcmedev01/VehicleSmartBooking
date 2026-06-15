@@ -1,0 +1,299 @@
+@{
+    ViewData["Title"] = "คู่มือเปิดการแจ้งเตือนบนมือถือ";
+    Layout = "~/Views/Shared/_VehicleBookingLayout.cshtml";
+}
+
+<section class="vb-section is-active">
+    <div class="vb-page-head mb-4">
+        <h5 class="mb-0 fw-bold"><i class="bi bi-phone me-2"></i>คู่มือเปิดการแจ้งเตือนบนมือถือสำหรับ พขร.</h5>
+        <div class="text-muted small mt-1">Vehicle Smart Booking — PWA Web Push &amp; In-App Notification Guide</div>
+    </div>
+
+    <div class="vb-card p-3 p-md-4 mb-3" id="pushCard">
+        <div class="fw-semibold mb-1">
+            <i class="bi bi-bell-fill text-primary me-2"></i>เปิดการแจ้งเตือนบนมือถือ
+        </div>
+        <div class="text-muted small mb-3">รับการแจ้งเตือนโดยตรงบนโทรศัพท์เมื่อมีงานมอบหมายใหม่</div>
+
+        <div id="pushStatus" class="mb-3"></div>
+
+        <div class="d-flex flex-wrap gap-2">
+            <button type="button" id="subscribeBtn" class="btn btn-primary">
+                <i class="bi bi-bell me-1"></i>เปิดการแจ้งเตือนบนมือถือ
+            </button>
+            <button type="button" id="unsubscribeBtn" class="btn btn-outline-secondary d-none">
+                <i class="bi bi-bell-slash me-1"></i>ปิดการแจ้งเตือน
+            </button>
+            <button type="button" id="testBtn" class="btn btn-outline-success d-none">
+                <i class="bi bi-send me-1"></i>ทดสอบแจ้งเตือน
+            </button>
+        </div>
+    </div>
+
+    <div class="vb-card p-3 p-md-4 mb-3">
+        <div class="fw-semibold mb-2"><i class="bi bi-info-circle text-primary me-2"></i>ข้อมูลสำคัญก่อนเริ่ม</div>
+        <ul class="mb-0 text-muted small" style="line-height:2;">
+            <li>ระบบนี้เป็น <strong>เว็บแอปพลิเคชัน</strong> ไม่ใช่แอปมือถือที่ต้องดาวน์โหลดจาก App Store หรือ Play Store</li>
+            <li>กดปุ่ม <strong>"เปิดการแจ้งเตือนบนมือถือ"</strong> ด้านบนแล้วอนุญาตเพื่อรับ push notification</li>
+            <li>หาก push notification ยังไม่เด้ง <strong>สามารถดูการแจ้งเตือนได้เสมอ</strong> จากไอคอนกระดิ่ง <i class="bi bi-bell"></i> ในระบบ</li>
+        </ul>
+    </div>
+
+    <div class="row g-3 mb-3">
+        <div class="col-12 col-md-6">
+            <div class="vb-card p-3 p-md-4 h-100">
+                <div class="fw-semibold mb-3">
+                    <i class="bi bi-android2 text-success me-2" style="font-size:1.1rem;"></i>Android (Chrome)
+                </div>
+                <ol class="mb-0 small" style="line-height:2.2;padding-left:1.2rem;">
+                    <li>เปิดเว็บ <strong>Vehicle Smart Booking</strong> ด้วย <strong>Chrome</strong></li>
+                    <li>Login เข้าระบบ</li>
+                    <li>เปิดหน้า <strong>คู่มือการแจ้งเตือน</strong></li>
+                    <li>กดปุ่ม <strong>"เปิดการแจ้งเตือนบนมือถือ"</strong></li>
+                    <li>กด <strong>Allow</strong> เมื่อระบบถาม</li>
+                    <li>กด <strong>"ทดสอบแจ้งเตือน"</strong> เพื่อยืนยันว่าใช้งานได้</li>
+                </ol>
+            </div>
+        </div>
+        <div class="col-12 col-md-6">
+            <div class="vb-card p-3 p-md-4 h-100">
+                <div class="fw-semibold mb-3">
+                    <i class="bi bi-apple text-dark me-2" style="font-size:1.1rem;"></i>iPhone (Safari) — สำคัญมาก
+                </div>
+                <ol class="mb-0 small" style="line-height:2.2;padding-left:1.2rem;">
+                    <li>เปิดเว็บ <strong>Vehicle Smart Booking</strong> ด้วย <strong>Safari</strong></li>
+                    <li>กดปุ่ม <strong>Share</strong> <i class="bi bi-box-arrow-up"></i> ที่แถบล่าง</li>
+                    <li>เลือก <strong>Add to Home Screen</strong></li>
+                    <li>เปิดระบบจาก <strong>icon บนหน้าจอ Home เท่านั้น</strong> — ห้ามเปิดจาก Safari</li>
+                    <li>Login เข้าระบบ</li>
+                    <li>กดปุ่ม <strong>"เปิดการแจ้งเตือนบนมือถือ"</strong></li>
+                    <li>กด <strong>Allow</strong> เมื่อระบบถาม</li>
+                    <li>กด <strong>"ทดสอบแจ้งเตือน"</strong> เพื่อยืนยัน</li>
+                </ol>
+            </div>
+        </div>
+    </div>
+
+    <div class="vb-card p-3 p-md-4 mb-3">
+        <div class="fw-semibold mb-2"><i class="bi bi-exclamation-triangle text-warning me-2"></i>การแก้ไขปัญหา (Troubleshooting)</div>
+        <ul class="mb-0 small" style="line-height:2.2;">
+            <li>ถ้า <strong>ปุ่มเป็นสีเทา/ใช้ไม่ได้</strong> → เบราว์เซอร์ไม่รองรับ หรือไม่ใช่ HTTPS</li>
+            <li>ถ้า <strong>ไม่มี popup ถามสิทธิ์</strong> → ตรวจสอบว่าเคยกด Block ไปแล้ว ให้เปิด permission จากการตั้งค่าเบราว์เซอร์</li>
+            <li>iPhone ต้องเปิดจาก <strong>icon ที่ Add to Home Screen เท่านั้น</strong> — เปิดจาก Safari tab ปกติจะไม่ได้รับ push notification</li>
+            <li>ระบบต้องใช้ <strong>HTTPS</strong> (localhost ใช้งานได้สำหรับทดสอบ)</li>
+            <li>ถ้า notification ไม่เด้ง ให้ตรวจสอบงานได้เสมอจาก <strong><i class="bi bi-bell"></i> ไอคอนกระดิ่ง</strong> ในระบบ</li>
+        </ul>
+    </div>
+
+    <div class="vb-card p-3 p-md-4 border-primary" style="border-left:4px solid var(--bs-primary)!important;">
+        <div class="fw-semibold mb-1"><i class="bi bi-bell text-primary me-2"></i>ดูการแจ้งเตือนทันที</div>
+        <div class="text-muted small mb-3">ไม่ต้องรอ push notification — สามารถดูการแจ้งเตือนทั้งหมดได้จากหน้านี้</div>
+        <a asp-controller="Notifications" asp-action="Index" class="btn btn-primary btn-sm">
+            <i class="bi bi-bell me-1"></i>ไปยังหน้าการแจ้งเตือน
+        </a>
+    </div>
+</section>
+
+@section Scripts {
+<script>
+(function () {
+    var supportsNotif = 'Notification' in window && 'serviceWorker' in navigator && 'PushManager' in window;
+    var statusEl    = document.getElementById('pushStatus');
+    var subscribeBtn  = document.getElementById('subscribeBtn');
+    var unsubscribeBtn = document.getElementById('unsubscribeBtn');
+    var testBtn     = document.getElementById('testBtn');
+
+    if (!supportsNotif) {
+        showStatus('warning', 'เบราว์เซอร์นี้ไม่รองรับการแจ้งเตือนบนมือถือ');
+        if (subscribeBtn) subscribeBtn.disabled = true;
+        return;
+    }
+
+    var isSecure = location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+    if (!isSecure) {
+        showStatus('warning', 'ต้องใช้ HTTPS สำหรับการแจ้งเตือนบนมือถือ');
+        if (subscribeBtn) subscribeBtn.disabled = true;
+        return;
+    }
+
+    // Assess current state on load
+    checkCurrentState();
+
+    async function checkCurrentState() {
+        if (Notification.permission === 'denied') {
+            showStatus('danger', 'คุณปิดการอนุญาตแจ้งเตือน กรุณาเปิดจากการตั้งค่าเบราว์เซอร์');
+            if (subscribeBtn) subscribeBtn.disabled = true;
+            return;
+        }
+
+        try {
+            var reg = await navigator.serviceWorker.getRegistration('/service-worker.js');
+            if (reg) {
+                var sub = await reg.pushManager.getSubscription();
+                if (sub) {
+                    setSubscribedUI();
+                    return;
+                }
+            }
+        } catch (e) { /* SW not registered yet — normal on first visit */ }
+
+        if (Notification.permission === 'granted') {
+            showStatus('info', 'เปิดสิทธิ์แจ้งเตือนแล้ว กดปุ่มเพื่อสมัครรับแจ้งเตือน');
+        } else {
+            showStatus('info', 'กดปุ่มด้านล่างเพื่อเปิดการแจ้งเตือนบนมือถือ');
+        }
+    }
+
+    function setSubscribedUI() {
+        showStatus('success', 'เปิดการแจ้งเตือนบนมือถือแล้ว');
+        if (subscribeBtn)   { subscribeBtn.classList.add('d-none'); }
+        if (unsubscribeBtn) { unsubscribeBtn.classList.remove('d-none'); }
+        if (testBtn)        { testBtn.classList.remove('d-none'); }
+    }
+
+    function setUnsubscribedUI() {
+        if (subscribeBtn)   { subscribeBtn.classList.remove('d-none'); subscribeBtn.disabled = false; subscribeBtn.innerHTML = '<i class="bi bi-bell me-1"></i>เปิดการแจ้งเตือนบนมือถือ'; }
+        if (unsubscribeBtn) { unsubscribeBtn.classList.add('d-none'); }
+        if (testBtn)        { testBtn.classList.add('d-none'); }
+    }
+
+    // Subscribe button
+    if (subscribeBtn) {
+        subscribeBtn.addEventListener('click', async function () {
+            subscribeBtn.disabled = true;
+            subscribeBtn.textContent = 'กำลังดำเนินการ...';
+            try {
+                await doSubscribe();
+            } catch (e) {
+                showStatus('danger', 'เกิดข้อผิดพลาด: ' + (e.message || e));
+                subscribeBtn.disabled = false;
+                subscribeBtn.innerHTML = '<i class="bi bi-bell me-1"></i>เปิดการแจ้งเตือนบนมือถือ';
+            }
+        });
+    }
+
+    // Unsubscribe button
+    if (unsubscribeBtn) {
+        unsubscribeBtn.addEventListener('click', async function () {
+            unsubscribeBtn.disabled = true;
+            unsubscribeBtn.textContent = 'กำลังดำเนินการ...';
+            try {
+                var reg = await navigator.serviceWorker.getRegistration('/service-worker.js');
+                if (reg) {
+                    var sub = await reg.pushManager.getSubscription();
+                    if (sub) {
+                        var endpoint = sub.endpoint;
+                        await sub.unsubscribe();
+                        await fetch('/PushNotifications/Unsubscribe', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            credentials: 'same-origin',
+                            body: JSON.stringify({ endpoint: endpoint })
+                        });
+                    }
+                }
+                showStatus('secondary', 'ปิดการแจ้งเตือนบนมือถือแล้ว');
+                setUnsubscribedUI();
+            } catch (e) {
+                showStatus('danger', 'เกิดข้อผิดพลาด: ' + (e.message || e));
+                unsubscribeBtn.disabled = false;
+                unsubscribeBtn.innerHTML = '<i class="bi bi-bell-slash me-1"></i>ปิดการแจ้งเตือน';
+            }
+        });
+    }
+
+    // Test button
+    if (testBtn) {
+        testBtn.addEventListener('click', async function () {
+            testBtn.disabled = true;
+            testBtn.textContent = 'กำลังส่ง...';
+            try {
+                var resp = await fetch('/PushNotifications/Test', {
+                    method: 'POST',
+                    credentials: 'same-origin'
+                });
+                var data = await resp.json();
+                if (data.success) {
+                    showStatus('success', data.message || 'ส่งการทดสอบแจ้งเตือนแล้ว กรุณาตรวจสอบโทรศัพท์');
+                    if (window.refreshNotifBadges) window.refreshNotifBadges();
+                } else {
+                    showStatus('warning', data.message || 'เกิดข้อผิดพลาดในการส่ง');
+                }
+            } catch (e) {
+                showStatus('danger', 'เกิดข้อผิดพลาด: ' + (e.message || e));
+            }
+            testBtn.disabled = false;
+            testBtn.innerHTML = '<i class="bi bi-send me-1"></i>ทดสอบแจ้งเตือน';
+        });
+    }
+
+    async function doSubscribe() {
+        var perm = Notification.permission === 'granted'
+            ? 'granted'
+            : await Notification.requestPermission();
+
+        if (perm !== 'granted') {
+            showStatus('danger', 'คุณปิดการอนุญาตแจ้งเตือน กรุณาเปิดจากการตั้งค่าเบราว์เซอร์');
+            subscribeBtn.disabled = false;
+            subscribeBtn.innerHTML = '<i class="bi bi-bell me-1"></i>เปิดการแจ้งเตือนบนมือถือ';
+            return;
+        }
+
+        // Get VAPID public key
+        var keyResp = await fetch('/PushNotifications/PublicKey', { credentials: 'same-origin' });
+        var keyData = await keyResp.json();
+        if (!keyData.enabled || !keyData.publicKey) {
+            showStatus('warning', 'Web Push ยังไม่ได้ตั้งค่า VAPID กรุณาติดต่อผู้ดูแลระบบ');
+            subscribeBtn.disabled = false;
+            subscribeBtn.innerHTML = '<i class="bi bi-bell me-1"></i>เปิดการแจ้งเตือนบนมือถือ';
+            return;
+        }
+
+        // Register & get SW
+        var registration = await navigator.serviceWorker.register('/service-worker.js');
+        await navigator.serviceWorker.ready;
+
+        // Subscribe via PushManager
+        var subscription = await registration.pushManager.subscribe({
+            userVisibleOnly: true,
+            applicationServerKey: urlBase64ToUint8Array(keyData.publicKey)
+        });
+
+        var subJson = subscription.toJSON();
+        var resp = await fetch('/PushNotifications/Subscribe', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'same-origin',
+            body: JSON.stringify({
+                endpoint: subJson.endpoint,
+                p256dh: subJson.keys.p256dh,
+                auth: subJson.keys.auth,
+                userAgent: navigator.userAgent
+            })
+        });
+        var result = await resp.json();
+        if (result.success) {
+            setSubscribedUI();
+        } else {
+            showStatus('danger', result.message || 'เกิดข้อผิดพลาดในการบันทึก');
+            subscribeBtn.disabled = false;
+            subscribeBtn.innerHTML = '<i class="bi bi-bell me-1"></i>เปิดการแจ้งเตือนบนมือถือ';
+        }
+    }
+
+    function showStatus(type, msg) {
+        if (!statusEl) return;
+        statusEl.innerHTML = '<div class="alert alert-' + type + ' mb-0 py-2 small">' + msg + '</div>';
+    }
+
+    function urlBase64ToUint8Array(base64String) {
+        var padding = '='.repeat((4 - base64String.length % 4) % 4);
+        var base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+        var rawData = atob(base64);
+        var outputArray = new Uint8Array(rawData.length);
+        for (var i = 0; i < rawData.length; ++i) { outputArray[i] = rawData.charCodeAt(i); }
+        return outputArray;
+    }
+})();
+</script>
+}

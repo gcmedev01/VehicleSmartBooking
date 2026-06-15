@@ -2,6 +2,7 @@
 using Microsoft.EntityFrameworkCore;
 using VehicleBooking.Web.Data;
 using VehicleBooking.Web.Domain.Options;
+using VehicleBooking.Web.Domain.Options;
 using VehicleBooking.Web.Domain.Services;
 using VehicleSmartBooking.Features.Dashboard.Queries;
 
@@ -52,6 +53,10 @@ builder.Services.Configure<EmailNotificationOptions>(
     builder.Configuration.GetSection("EmailNotification")
 );
 
+builder.Services.Configure<VapidOptions>(
+    builder.Configuration.GetSection("Vapid")
+);
+
 // removed ISsoClient registration
 builder.Services.AddAuthorization();
 builder.Services.AddScoped<IPasswordHasher, Pbkdf2PasswordHasher>();
@@ -60,6 +65,9 @@ builder.Services.AddScoped<IDriverWorkflowService, DriverWorkflowService>();
 builder.Services.AddScoped<IEmailNotificationService, EmailNotificationService>();
 builder.Services.AddScoped<ApprovalChainBuilder>();
 builder.Services.AddScoped<IDashboardQueryService, DashboardQueryService>();
+builder.Services.AddScoped<INotificationService, NotificationService>();
+builder.Services.AddScoped<IWebPushSender, WebPushSender>();
+builder.Services.AddScoped<IDriverBookingNotificationService, DriverBookingNotificationService>();
 
 // IHttpContextAccessor needed for CurrentUserService to read session
 builder.Services.AddHttpContextAccessor();
@@ -71,6 +79,23 @@ if (app.Environment.IsDevelopment())
     using var scope = app.Services.CreateScope();
     var db = scope.ServiceProvider.GetRequiredService<VehicleBookingDbContext>();
     await DbSeeder.SeedDevAsync(db);
+
+    // Warn if VAPID keys are missing and log generated keys as a convenience
+    var vapid = scope.ServiceProvider.GetRequiredService<Microsoft.Extensions.Options.IOptions<VapidOptions>>().Value;
+    if (!vapid.IsConfigured)
+    {
+        var startupLog = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
+        startupLog.LogWarning("VAPID keys not configured — Web Push is disabled. Add keys to appsettings.json under \"Vapid\".");
+        try
+        {
+            var keys = WebPush.VapidHelper.GenerateVapidKeys();
+            startupLog.LogWarning("Generated VAPID keys (copy to appsettings.json and keep PrivateKey secret):");
+            startupLog.LogWarning("  \"Vapid:Subject\": \"mailto:admin@yourdomain.com\"");
+            startupLog.LogWarning("  \"Vapid:PublicKey\": \"{PublicKey}\"", keys.PublicKey);
+            startupLog.LogWarning("  \"Vapid:PrivateKey\": \"{PrivateKey}\"", keys.PrivateKey);
+        }
+        catch { /* non-fatal */ }
+    }
 }
 
 // Configure the HTTP request pipeline.

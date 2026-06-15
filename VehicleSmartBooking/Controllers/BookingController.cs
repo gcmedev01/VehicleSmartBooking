@@ -21,14 +21,16 @@ namespace VehicleSmartBooking.Controllers
         private readonly ILogger<BookingController> _logger;
         private readonly IEmailNotificationService _emailNotifications;
         private readonly ApprovalChainBuilder _approvalChainBuilder;
+        private readonly IDriverBookingNotificationService _driverBookingNotifications;
 
-        public BookingController(VehicleBookingDbContext db, IWebHostEnvironment env, ILogger<BookingController> logger, IEmailNotificationService emailNotifications, ApprovalChainBuilder approvalChainBuilder)
+        public BookingController(VehicleBookingDbContext db, IWebHostEnvironment env, ILogger<BookingController> logger, IEmailNotificationService emailNotifications, ApprovalChainBuilder approvalChainBuilder, IDriverBookingNotificationService driverBookingNotifications)
         {
             _db = db;
             _env = env;
             _logger = logger;
             _emailNotifications = emailNotifications;
             _approvalChainBuilder = approvalChainBuilder;
+            _driverBookingNotifications = driverBookingNotifications;
         }
 
         public class BookingFormModel
@@ -528,6 +530,12 @@ namespace VehicleSmartBooking.Controllers
                 booking.UpdatedAtUtc = now;
                 await _db.SaveChangesAsync();
                 await tx.CommitAsync();
+
+                if (booking.Status == BookingStatus.WaitingDriverAccept && booking.AssignedDriverId.HasValue)
+                {
+                    try { await _driverBookingNotifications.NotifyNewAssignmentAsync(booking.BookingId, booking.AssignedDriverId.Value); }
+                    catch (Exception ex) { _logger.LogWarning(ex, "Failed to notify driver for new assignment, booking {BookingId}", booking.BookingId); }
+                }
 
                 var adminEmails = await _db.Users
                     .AsNoTracking()

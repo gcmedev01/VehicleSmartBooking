@@ -21,6 +21,8 @@ public sealed class VehicleBookingDbContext : DbContext
     public DbSet<DriverRating> DriverRatings => Set<DriverRating>();
     public DbSet<BookingAttachment> BookingAttachments => Set<BookingAttachment>();
     public DbSet<DriverCompletionPhoto> DriverCompletionPhotos => Set<DriverCompletionPhoto>();
+    public DbSet<Notification> Notifications => Set<Notification>();
+    public DbSet<PushSubscription> PushSubscriptions => Set<PushSubscription>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -368,6 +370,53 @@ public sealed class VehicleBookingDbContext : DbContext
                 .OnDelete(DeleteBehavior.Restrict);
 
             e.HasIndex(x => x.BookingId).HasDatabaseName("IX_DriverCompletionPhotos_Booking");
+        });
+
+        // NOTIFICATIONS
+        modelBuilder.Entity<Notification>(e =>
+        {
+            e.ToTable("Notifications", "dbo");
+            e.HasKey(x => x.NotificationId);
+
+            e.Property(x => x.Type).HasConversion<int>().IsRequired();
+            e.Property(x => x.Title).HasMaxLength(500).IsRequired();
+            e.Property(x => x.Message).HasMaxLength(2000).IsRequired();
+            e.Property(x => x.Url).HasMaxLength(1000);
+            e.Property(x => x.IsRead).HasDefaultValue(false);
+            e.Property(x => x.CreatedAtUtc).HasColumnType("datetime2(0)").HasDefaultValueSql("sysutcdatetime()");
+            e.Property(x => x.ReadAtUtc).HasColumnType("datetime2(0)");
+
+            e.HasOne(x => x.User)
+                .WithMany()
+                .HasForeignKey(x => x.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            e.HasIndex(x => new { x.UserId, x.IsRead }).HasDatabaseName("IX_Notifications_User_IsRead");
+            e.HasIndex(x => x.CreatedAtUtc).HasDatabaseName("IX_Notifications_CreatedAt");
+        });
+
+        // PUSH SUBSCRIPTIONS
+        modelBuilder.Entity<PushSubscription>(e =>
+        {
+            e.ToTable("PushSubscriptions", "dbo");
+            e.HasKey(x => x.PushSubscriptionId);
+
+            e.Property(x => x.Endpoint).HasMaxLength(2000).IsRequired();
+            e.Property(x => x.P256dh).HasMaxLength(500).IsRequired();
+            e.Property(x => x.Auth).HasMaxLength(500).IsRequired();
+            e.Property(x => x.UserAgent).HasMaxLength(500);
+            e.Property(x => x.IsActive).HasDefaultValue(true);
+            e.Property(x => x.CreatedAtUtc).HasColumnType("datetime2(0)").HasDefaultValueSql("sysutcdatetime()");
+            e.Property(x => x.LastUsedAtUtc).HasColumnType("datetime2(0)");
+            e.Property(x => x.DeactivatedAtUtc).HasColumnType("datetime2(0)");
+
+            e.HasOne(x => x.User)
+                .WithMany()
+                .HasForeignKey(x => x.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            e.HasIndex(x => x.Endpoint).HasDatabaseName("IX_PushSubscriptions_Endpoint");
+            e.HasIndex(x => new { x.UserId, x.IsActive }).HasDatabaseName("IX_PushSubscriptions_User_Active");
         });
     }
 }

@@ -1,0 +1,18 @@
+{
+  "name": "Vehicle Smart Booking",
+  "short_name": "Vehicle Booking",
+  "description": "ระบบจองรถ Vehicle Smart Booking",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#0d6efd",
+  "lang": "th",
+  "icons": [
+    {
+      "src": "/img/van.png",
+      "sizes": "any",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

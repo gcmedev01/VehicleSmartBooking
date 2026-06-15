@@ -36,6 +36,10 @@
         // Driver
         else if (controller == "driver" && (action == "myjobs" || action == "detail")) active = "DriverJobs";
 
+        // Notifications / Help
+        else if (controller == "notifications") active = "Notifications";
+        else if (controller == "help") active = "DriverGuide";
+
         else active = "MyTask";
     }
 
@@ -121,6 +125,8 @@
     <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" asp-append-version="true" />
     <link href="~/lib/bootstrap-icons-1.13.1/bootstrap-icons.min.css" rel="stylesheet" />
     <link rel="stylesheet" href="~/css/vehicle-booking.css" asp-append-version="true" />
+    <link rel="manifest" href="/manifest.json" />
+    <meta name="theme-color" content="#0d6efd" />
 
     @RenderSection("Styles", required: false)
 </head>
@@ -251,6 +257,23 @@
                         </div>
                     }
 
+                    @* ========= Notifications (all logged-in users) ========= *@
+                    @if (User.Identity?.IsAuthenticated == true)
+                    {
+                        <div class="vb-nav-section">
+                            <div class="vb-nav-label">NOTIFICATIONS</div>
+                            <a asp-controller="Notifications" asp-action="Index"
+                               class="vb-nav-item @(active == "Notifications" ? "is-active" : "")"
+                               aria-current="@(active == "Notifications" ? "page" : "")">
+                                <span class="vb-nav-icon"><i class="bi bi-bell"></i></span>
+                                การแจ้งเตือน
+                                <span class="ms-auto badge rounded-pill bg-danger d-none"
+                                      data-notification-badge
+                                      style="font-size:.7rem;padding:3px 6px;line-height:1;"></span>
+                            </a>
+                        </div>
+                    }
+
                     @* ========= Driver ========= *@
                     @if (isDriver)
                     {
@@ -262,6 +285,13 @@
                                aria-current="@(active == "DriverJobs" ? "page" : "")">
                                 <span class="vb-nav-icon"><i class="bi bi-steering-wheel"></i></span>
                                 My Jobs
+                            </a>
+
+                            <a asp-controller="Help" asp-action="DriverNotificationGuide"
+                               class="vb-nav-item @(active == "DriverGuide" ? "is-active" : "")"
+                               aria-current="@(active == "DriverGuide" ? "page" : "")">
+                                <span class="vb-nav-icon"><i class="bi bi-phone"></i></span>
+                                คู่มือการแจ้งเตือน
                             </a>
                         </div>
                     }
@@ -278,6 +308,35 @@
                             </div>
                             <div class="text-muted small">@userCode</div>
                         </div>
+
+                        @if (User.Identity?.IsAuthenticated == true)
+                        {
+                            <div class="dropdown">
+                                <button class="btn btn-sm btn-outline-secondary position-relative"
+                                        type="button"
+                                        id="notifBellBtn"
+                                        data-bs-toggle="dropdown"
+                                        data-bs-auto-close="outside"
+                                        aria-expanded="false"
+                                        title="การแจ้งเตือน">
+                                    <i class="bi bi-bell"></i>
+                                    <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger d-none"
+                                          data-notification-badge
+                                          style="font-size:.6rem;padding:2px 5px;line-height:1.2;"></span>
+                                </button>
+                                <div class="dropdown-menu dropdown-menu-end shadow-sm p-0"
+                                     style="min-width:300px;max-width:360px;"
+                                     aria-labelledby="notifBellBtn">
+                                    <div class="d-flex justify-content-between align-items-center px-3 py-2 border-bottom">
+                                        <span class="fw-semibold small">การแจ้งเตือน</span>
+                                        <a asp-controller="Notifications" asp-action="Index" class="small text-primary">ดูทั้งหมด</a>
+                                    </div>
+                                    <div id="notifDropdownItems" style="max-height:320px;overflow-y:auto;">
+                                        <div class="text-center py-3 text-muted small">กำลังโหลด...</div>
+                                    </div>
+                                </div>
+                            </div>
+                        }
 
                         <form asp-controller="Account" asp-action="Logout" method="post" class="m-0">
                             @Html.AntiForgeryToken()
@@ -303,6 +362,96 @@
     <script src="~/lib/jquery/dist/jquery.min.js"></script>
     <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <script>
+    // Register service worker for PWA Web Push (HTTPS / localhost only)
+    if ('serviceWorker' in navigator
+        && (location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1')) {
+        navigator.serviceWorker.register('/service-worker.js')
+            .catch(function (err) { console.warn('[SW] Registration failed:', err); });
+    }
+    </script>
+
+    @if (User.Identity?.IsAuthenticated == true)
+    {
+        <script>
+        (function () {
+            // ── Badge helpers ─────────────────────────────────────────────
+            function updateBadges(count) {
+                var badges = document.querySelectorAll('[data-notification-badge]');
+                var text = count > 99 ? '99+' : String(count);
+                badges.forEach(function (el) {
+                    if (count > 0) {
+                        el.textContent = text;
+                        el.classList.remove('d-none');
+                    } else {
+                        el.classList.add('d-none');
+                    }
+                });
+            }
+
+            // Exposed globally so any page script can trigger a refresh
+            window.refreshNotifBadges = function () {
+                fetch('/Notifications/GetUnreadCount', { credentials: 'same-origin' })
+                    .then(function (r) { return r.ok ? r.json() : null; })
+                    .then(function (d) { if (d) updateBadges(d.count); })
+                    .catch(function (e) { console.warn('[Notif] Failed to fetch unread count', e); });
+            };
+
+            // Fetch count on initial page load
+            window.refreshNotifBadges();
+
+            // ── Bell dropdown ─────────────────────────────────────────────
+            var bell = document.getElementById('notifBellBtn');
+            if (!bell) return;
+
+            // Reload dropdown items every time it opens (shows fresh data)
+            bell.addEventListener('shown.bs.dropdown', function () {
+                loadRecent();
+            });
+
+            function loadRecent() {
+                var container = document.getElementById('notifDropdownItems');
+                if (!container) return;
+                container.innerHTML = '<div class="text-center py-2 text-muted small">กำลังโหลด...</div>';
+
+                fetch('/Notifications/GetRecent', { credentials: 'same-origin' })
+                    .then(function (r) { return r.ok ? r.json() : null; })
+                    .then(function (d) {
+                        if (!d || !d.items || d.items.length === 0) {
+                            container.innerHTML = '<div class="text-center py-3 text-muted small">ไม่มีการแจ้งเตือน</div>';
+                            return;
+                        }
+                        container.innerHTML = d.items.map(function (n) {
+                            var bg = n.isRead ? '' : 'bg-light';
+                            var fw = n.isRead ? '' : 'fw-semibold';
+                            var dt = '';
+                            if (n.createdAtUtc) {
+                                try { dt = new Date(n.createdAtUtc).toLocaleString('th-TH', { dateStyle: 'short', timeStyle: 'short' }); }
+                                catch (e) { dt = ''; }
+                            }
+                            return '<a href="/Notifications/MarkReadAndRedirect/' + n.notificationId + '"'
+                                + ' class="d-block text-decoration-none text-dark border-bottom px-3 py-2 ' + bg + '">'
+                                + '<div class="small ' + fw + '">' + esc(n.title) + '</div>'
+                                + '<div class="text-muted" style="font-size:.8rem;white-space:normal;">' + esc(n.message) + '</div>'
+                                + (dt ? '<div class="text-muted" style="font-size:.75rem;">' + dt + '</div>' : '')
+                                + '</a>';
+                        }).join('');
+                    })
+                    .catch(function (e) {
+                        console.warn('[Notif] Failed to load recent notifications', e);
+                        if (container) container.innerHTML = '<div class="text-center py-3 text-muted small">โหลดไม่สำเร็จ</div>';
+                    });
+            }
+
+            function esc(s) {
+                if (!s) return '';
+                var el = document.createElement('div');
+                el.textContent = s;
+                return el.innerHTML;
+            }
+        })();
+        </script>
+    }
     @await RenderSectionAsync("Scripts", required: false)
 </body>
 </html>

@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using VehicleBooking.Web.Data;
 
@@ -11,9 +12,11 @@ using VehicleBooking.Web.Data;
 namespace VehicleSmartBooking.Migrations
 {
     [DbContext(typeof(VehicleBookingDbContext))]
-    partial class VehicleBookingDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260610082946_AddNotifications")]
+    partial class AddNotifications
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -563,66 +566,6 @@ namespace VehicleSmartBooking.Migrations
                     b.ToTable("Notifications", "dbo");
                 });
 
-            modelBuilder.Entity("VehicleBooking.Web.Domain.Entities.PushSubscription", b =>
-                {
-                    b.Property<long>("PushSubscriptionId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("PushSubscriptionId"));
-
-                    b.Property<string>("Auth")
-                        .IsRequired()
-                        .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
-
-                    b.Property<DateTime>("CreatedAtUtc")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("datetime2(0)")
-                        .HasDefaultValueSql("sysutcdatetime()");
-
-                    b.Property<DateTime?>("DeactivatedAtUtc")
-                        .HasColumnType("datetime2(0)");
-
-                    b.Property<int?>("DriverId")
-                        .HasColumnType("int");
-
-                    b.Property<string>("Endpoint")
-                        .IsRequired()
-                        .HasMaxLength(2000)
-                        .HasColumnType("nvarchar(2000)");
-
-                    b.Property<bool>("IsActive")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bit")
-                        .HasDefaultValue(true);
-
-                    b.Property<DateTime?>("LastUsedAtUtc")
-                        .HasColumnType("datetime2(0)");
-
-                    b.Property<string>("P256dh")
-                        .IsRequired()
-                        .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
-
-                    b.Property<string>("UserAgent")
-                        .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
-
-                    b.Property<int>("UserId")
-                        .HasColumnType("int");
-
-                    b.HasKey("PushSubscriptionId");
-
-                    b.HasIndex("Endpoint")
-                        .HasDatabaseName("IX_PushSubscriptions_Endpoint");
-
-                    b.HasIndex("UserId", "IsActive")
-                        .HasDatabaseName("IX_PushSubscriptions_User_Active");
-
-                    b.ToTable("PushSubscriptions", "dbo");
-                });
-
             modelBuilder.Entity("VehicleBooking.Web.Domain.Entities.User", b =>
                 {
                     b.Property<int>("UserId")
@@ -1014,17 +957,6 @@ namespace VehicleSmartBooking.Migrations
                 });
 
             modelBuilder.Entity("VehicleBooking.Web.Domain.Entities.Notification", b =>
-                {
-                    b.HasOne("VehicleBooking.Web.Domain.Entities.User", "User")
-                        .WithMany()
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("User");
-                });
-
-            modelBuilder.Entity("VehicleBooking.Web.Domain.Entities.PushSubscription", b =>
                 {
                     b.HasOne("VehicleBooking.Web.Domain.Entities.User", "User")
                         .WithMany()

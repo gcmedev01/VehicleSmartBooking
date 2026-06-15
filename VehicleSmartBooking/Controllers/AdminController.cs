@@ -26,19 +26,21 @@ namespace VehicleSmartBooking.Controllers
         private readonly IPasswordHasher _hasher;
         private readonly IEmailNotificationService _emailNotifications;
         private readonly ApprovalChainBuilder _approvalChainBuilder;
+        private readonly IDriverBookingNotificationService _driverBookingNotifications;
 
         private const int ROLE_USER = 1;
         private const int ROLE_DRIVER = 4;
         private const int ROLE_ADMIN = 2;
         private const int ROLE_APPROVER = 8;
 
-        public AdminController(VehicleBookingDbContext db, ILogger<AdminController> logger, IPasswordHasher hasher, IEmailNotificationService emailNotifications, ApprovalChainBuilder approvalChainBuilder)
+        public AdminController(VehicleBookingDbContext db, ILogger<AdminController> logger, IPasswordHasher hasher, IEmailNotificationService emailNotifications, ApprovalChainBuilder approvalChainBuilder, IDriverBookingNotificationService driverBookingNotifications)
         {
             _db = db;
             _logger = logger;
             _hasher = hasher;
             _emailNotifications = emailNotifications;
             _approvalChainBuilder = approvalChainBuilder;
+            _driverBookingNotifications = driverBookingNotifications;
         }
 
         // GET: /Admin/Worklist
@@ -1573,11 +1575,31 @@ namespace VehicleSmartBooking.Controllers
                 return RedirectToAction(nameof(Detail), new { id });
             }
 
+            int? oldDriverId = booking.AssignedDriverId;
+            bool driverChanged = oldDriverId != driver.DriverId;
+
             booking.AssignedDriverId  = driver.DriverId;
             booking.AssignedVehicleId = driver.VehicleId;
             booking.UpdatedAtUtc      = DateTime.UtcNow;
 
+            if (driverChanged)
+            {
+                booking.Status = BookingStatus.WaitingDriverAccept;
+            }
+
             await _db.SaveChangesAsync();
+
+            if (driverChanged)
+            {
+                try { await _driverBookingNotifications.NotifyAdminReassignedToNewDriverAsync(booking.BookingId, oldDriverId, driver.DriverId); }
+                catch (Exception ex) { _logger.LogWarning(ex, "Failed to notify new driver for booking {BookingId}", booking.BookingId); }
+
+                if (oldDriverId.HasValue)
+                {
+                    try { await _driverBookingNotifications.NotifyAdminReassignedAwayFromOldDriverAsync(booking.BookingId, oldDriverId.Value, driver.DriverId); }
+                    catch (Exception ex) { _logger.LogWarning(ex, "Failed to notify old driver for booking {BookingId}", booking.BookingId); }
+                }
+            }
 
             TempData["Success"] = "เปลี่ยน พขร./รถ เรียบร้อยแล้ว";
             return RedirectToAction(nameof(Detail), new { id });
