@@ -14,6 +14,8 @@
     const specialOccasionType = $("#SpecialOccasionType");
     const specialOccasionRemark = $("#SpecialOccasionRemark");
     const approvalPreview = $("#vbApprovalPreview");
+    const attachmentsInput = $("#Attachments");
+    const attachmentsRequiredMark = $("#attachmentsRequiredMark");
 
     const btnReset = $("#btnReset");
     const availabilityBox = $("#vbAvailability");
@@ -168,8 +170,25 @@
         // Special occasion fields availability will be controlled by vehicle type (van only)
         // (Handled by updateSpecialOccasionUI)
 
+        // Attachments are mandatory for out-of-province bookings, optional for in-province. Do not
+        // clear an already-chosen file when switching back to "in" — the files may still be relevant.
+        if (attachmentsInput) {
+            if (m === "out") {
+                attachmentsInput.setAttribute("required", "required");
+            } else {
+                attachmentsInput.removeAttribute("required");
+            }
+        }
+        if (attachmentsRequiredMark) {
+            attachmentsRequiredMark.classList.toggle("d-none", m !== "out");
+        }
+
         updateAvailability();
         updateElectricModeUI();
+        // Booking mode (in/out province) affects ApprovalScenario just as much as vehicle type
+        // does — recalculate here too, not only on vehicle-type change (this was the root cause
+        // of a stale approval chain when the user picked vehicle type before booking mode).
+        refreshApprovalChain();
 
         // NOTE: ถ้าอนาคตอยาก disable fields เมื่อ personal ให้ทำตรงนี้ได้
         // const disable = (m === "personal");
@@ -183,58 +202,150 @@
         approvalPreview.style.display = isOutProvince && isElectricVehicle(getSelectedVehicleType()) ? "none" : "";
     }
 
-    async function updateApprovalPreview() {
+    // ── Approval chain: single source of truth for rendering the preview box ──
+    function renderApprovalHeader() {
+        return '<div class="fw-semibold mb-3">ขั้นตอนการอนุมัติ</div>';
+    }
+
+    function renderApprovalMessage(message) {
+        if (!approvalPreview) return;
+        approvalPreview.innerHTML = renderApprovalHeader() + `<div class="text-muted small">${message}</div>`;
+    }
+
+    // Shown only while required fields (trip type / vehicle type) are missing — never once the
+    // data needed to calculate a real chain is present.
+    function renderApprovalPlaceholder() {
+        const hasTripType = !!(modeHidden?.value || "").trim();
+        const hasVehicleType = !!getSelectedVehicleType();
+
+        if (!hasTripType && !hasVehicleType) {
+            renderApprovalMessage("กรุณาเลือกประเภทการจองและประเภทรถเพื่อดูสายการอนุมัติ");
+        } else if (!hasTripType) {
+            renderApprovalMessage("กรุณาเลือกประเภทการจอง");
+        } else {
+            renderApprovalMessage("กรุณาเลือกประเภทรถ");
+        }
+    }
+
+    function renderApprovalLoading() {
+        renderApprovalMessage("กำลังคำนวณสายการอนุมัติ...");
+    }
+
+    function renderApprovalResult(data) {
+        const approvers = data.approvers || [];
+
+        if (approvers.length === 0) {
+            // Data is complete but there is genuinely nothing to show — say so accurately instead
+            // of the old generic fallback text (which used to appear even when the request truly
+            // has no approval step, e.g. auto-approved, or is auto-routed to an admin).
+            if (data.isAdminActionRequired) {
+                renderApprovalMessage("คำขอนี้ต้องให้ผู้ดูแลระบบ (Admin) ดำเนินการต่อ ไม่ผ่านสายอนุมัติปกติ");
+            } else if (data.isAuto) {
+                renderApprovalMessage("คำขอนี้ไม่ต้องผ่านขั้นตอนอนุมัติ (อนุมัติอัตโนมัติ)");
+            } else {
+                renderApprovalMessage("ไม่พบสายการอนุมัติสำหรับเงื่อนไขนี้");
+            }
+            return;
+        }
+
+        let html = renderApprovalHeader() + '<div class="vb-steps">';
+        approvers.forEach(a => {
+            const pos = a.position || '';
+            const name = a.name || '';
+            const level = a.levelNo || '';
+            html += `
+                <div class="vb-step">
+                    <div class="vb-step-badge">${level}</div>
+                    <div class="vb-step-body">
+                        <div class="vb-step-title">${pos}</div>
+                        <div class="vb-approver-card">
+                            <div class="vb-approver-row">
+                                <span class="vb-approver-label">ชื่อ-นามสกุล</span>
+                                <span class="vb-approver-value">${name}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>`;
+        });
+        html += '</div>';
+
+        if (approvalPreview) approvalPreview.innerHTML = html;
+    }
+
+    // Cancels the previous in-flight request (if any) so a slow/stale response can never overwrite
+    // the result for whatever the user has selected by the time it arrives.
+    let approvalAbortController = null;
+
+    async function calculateAndRenderApprovalChain() {
         if (!approvalPreview) return;
 
-        try {
-            const baseUrl = window.appBasePath || "/";
-            const params = new URLSearchParams();
-            params.set('bookingMode', (modeHidden?.value || 'in').toLowerCase());
-            params.set('vehicleType', getSelectedVehicleType());
-            const special = specialOccasionType ? (specialOccasionType.value || '') : '';
-            params.set('specialOccasionType', special);
+        const baseUrl = window.appBasePath || "/";
+        const params = new URLSearchParams();
+        params.set('bookingMode', (modeHidden?.value || 'in').toLowerCase());
+        params.set('vehicleType', getSelectedVehicleType());
+        params.set('specialOccasionType', specialOccasionType ? (specialOccasionType.value || '') : '');
+        params.set('serviceOption', serviceOptionInput ? (serviceOptionInput.value || '') : '');
+        params.set('startAt', startAtInput?.value || '');
+        params.set('endAt', endAtInput?.value || '');
 
+        if (approvalAbortController) {
+            approvalAbortController.abort();
+        }
+        const controller = new AbortController();
+        approvalAbortController = controller;
+
+        renderApprovalLoading();
+
+        try {
             const url = `${baseUrl}booking/preview-approvals?${params.toString()}`;
-            const resp = await fetch(url, { headers: { Accept: 'application/json' } });
-            if (!resp.ok) return;
-            const data = await resp.json();
-            if (!data?.ok) {
-                // show note
-                approvalPreview.innerHTML = `<div class="fw-semibold mb-3">ขั้นตอนการอนุมัติ</div><div class="text-muted small">${(data?.message) ? data.message : 'ไม่พบข้อมูลสายอนุมัติ'}</div>`;
+            const resp = await fetch(url, { headers: { Accept: 'application/json' }, signal: controller.signal });
+
+            // A newer request has already started; let that one own the render.
+            if (approvalAbortController !== controller) return;
+
+            if (!resp.ok) {
+                renderApprovalMessage('ไม่สามารถคำนวณสายการอนุมัติได้ในขณะนี้');
                 return;
             }
 
-            const approvers = data.approvers || [];
-            let html = '<div class="fw-semibold mb-3">ขั้นตอนการอนุมัติ</div>';
-            if (approvers.length === 0) {
-                html += `<div class="text-muted small">เงื่อนไขการอนุมัติขึ้นอยู่กับประเภทคำขอและสายบังคับบัญชา</div>`;
-            } else {
-                html += '<div class="vb-steps">';
-                approvers.forEach(a => {
-                    const pos = a.position || '';
-                    const name = a.name || '';
-                    const level = a.levelNo || '';
-                    html += `
-                        <div class="vb-step">
-                            <div class="vb-step-badge">${level}</div>
-                            <div class="vb-step-body">
-                                <div class="vb-step-title">${pos}</div>
-                                <div class="vb-approver-card">
-                                    <div class="vb-approver-row">
-                                        <span class="vb-approver-label">ชื่อ-นามสกุล</span>
-                                        <span class="vb-approver-value">${name}</span>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>`;
-                });
-                html += '</div>';
+            const data = await resp.json();
+            if (approvalAbortController !== controller) return;
+
+            if (!data?.ok) {
+                renderApprovalMessage(data?.message || 'ไม่พบข้อมูลสายอนุมัติ');
+                return;
             }
 
-            approvalPreview.innerHTML = html;
+            renderApprovalResult(data);
         } catch (e) {
-            // ignore errors silently
+            if (e?.name === 'AbortError') return; // superseded by a newer request — ignore
+            if (approvalAbortController === controller) {
+                renderApprovalMessage('ไม่สามารถคำนวณสายการอนุมัติได้ในขณะนี้');
+            }
+        } finally {
+            if (approvalAbortController === controller) approvalAbortController = null;
         }
+    }
+
+    // Central entry point: re-read the current field values fresh from the DOM every time (never
+    // rely on values captured at page-load) and either show a placeholder or (re)calculate the
+    // real chain. Call this — not calculateAndRenderApprovalChain() directly — from every trigger.
+    function refreshApprovalChain() {
+        if (!approvalPreview) return;
+
+        const tripType = (modeHidden?.value || "").trim();
+        const vehicleType = getSelectedVehicleType();
+
+        if (!tripType || !vehicleType) {
+            if (approvalAbortController) {
+                approvalAbortController.abort();
+                approvalAbortController = null;
+            }
+            renderApprovalPlaceholder();
+            return;
+        }
+
+        calculateAndRenderApprovalChain();
     }
 
     function updateSpecialOccasionUI() {
@@ -303,6 +414,7 @@
             if (!choice) return;
 
             if (serviceOptionInput) serviceOptionInput.value = choice;
+            refreshApprovalChain();
 
             const modal = choiceModalEl && bootstrap?.Modal ? bootstrap.Modal.getOrCreateInstance(choiceModalEl) : null;
             if (modal) modal.hide();
@@ -341,19 +453,26 @@
         });
     }
 
+    // Every field that can change ApprovalScenario re-triggers the same central function —
+    // no per-field bespoke calculation, matching the single source of truth in ApprovalChainBuilder.
     vehicleTypeInputs.forEach(el => el.addEventListener("change", updateAvailability));
     vehicleTypeInputs.forEach(el => el.addEventListener("change", updateElectricModeUI));
     vehicleTypeInputs.forEach(el => el.addEventListener("change", updateSpecialOccasionUI));
-    vehicleTypeInputs.forEach(el => el.addEventListener("change", updateApprovalPreview));
+    vehicleTypeInputs.forEach(el => el.addEventListener("change", refreshApprovalChain));
     if (startAtInput) startAtInput.addEventListener("change", updateAvailability);
     if (endAtInput) endAtInput.addEventListener("change", updateAvailability);
-    if (specialOccasionType) specialOccasionType.addEventListener("change", updateApprovalPreview);
+    // Multi-day vs single-day affects ApprovalScenario for electric vehicles.
+    if (startAtInput) startAtInput.addEventListener("change", refreshApprovalChain);
+    if (endAtInput) endAtInput.addEventListener("change", refreshApprovalChain);
+    if (specialOccasionType) specialOccasionType.addEventListener("change", refreshApprovalChain);
 
     // ===== init =====
-    // ถ้ามีค่าเดิมใน hidden ให้ยึดค่านั้น, ไม่งั้น default "in"
+    // Handles Create (default values), Edit, and returning from a validation error / browser form
+    // restore — always re-read the actual current input values rather than assuming page-load state.
+    // setBookingMode() already calls refreshApprovalChain() internally, so it doesn't need a
+    // separate call here (that would just abort-and-refetch the identical request once, uselessly).
     setBookingMode(modeHidden?.value || "in");
     updateAvailability();
     updateElectricModeUI();
     updateSpecialOccasionUI();
-    updateApprovalPreview();
 })();

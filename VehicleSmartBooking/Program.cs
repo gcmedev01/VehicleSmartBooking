@@ -39,6 +39,46 @@ builder.Services
         options.Cookie.HttpOnly = true;
         options.Cookie.SameSite = SameSiteMode.Lax;
         options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest; // dev ok
+
+        // For AJAX/API requests (e.g. Web Push fetch calls), return a JSON 401/403 instead of a
+        // 302 redirect to the HTML login page. Otherwise fetch() follows the redirect, receives
+        // HTML, and JSON.parse fails with "Unexpected token '<'". Normal page navigation is
+        // unaffected and still redirects to the login page.
+        options.Events = new CookieAuthenticationEvents
+        {
+            OnRedirectToLogin = ctx =>
+            {
+                if (IsApiRequest(ctx.Request))
+                {
+                    ctx.Response.StatusCode = StatusCodes.Status401Unauthorized;
+                    return Task.CompletedTask;
+                }
+                ctx.Response.Redirect(ctx.RedirectUri);
+                return Task.CompletedTask;
+            },
+            OnRedirectToAccessDenied = ctx =>
+            {
+                if (IsApiRequest(ctx.Request))
+                {
+                    ctx.Response.StatusCode = StatusCodes.Status403Forbidden;
+                    return Task.CompletedTask;
+                }
+                ctx.Response.Redirect(ctx.RedirectUri);
+                return Task.CompletedTask;
+            }
+        };
+
+        static bool IsApiRequest(HttpRequest request)
+        {
+            if (request.Path.StartsWithSegments("/PushNotifications", StringComparison.OrdinalIgnoreCase))
+                return true;
+            if (string.Equals(request.Headers["X-Requested-With"], "XMLHttpRequest", StringComparison.OrdinalIgnoreCase))
+                return true;
+            var accept = request.Headers.Accept.ToString();
+            return !string.IsNullOrEmpty(accept)
+                && accept.Contains("application/json", StringComparison.OrdinalIgnoreCase)
+                && !accept.Contains("text/html", StringComparison.OrdinalIgnoreCase);
+        }
     });
 
 builder.Services.Configure<SsoOptions>(
@@ -78,7 +118,6 @@ if (app.Environment.IsDevelopment())
 {
     using var scope = app.Services.CreateScope();
     var db = scope.ServiceProvider.GetRequiredService<VehicleBookingDbContext>();
-    await DbSeeder.SeedDevAsync(db);
 
     // Warn if VAPID keys are missing and log generated keys as a convenience
     var vapid = scope.ServiceProvider.GetRequiredService<Microsoft.Extensions.Options.IOptions<VapidOptions>>().Value;

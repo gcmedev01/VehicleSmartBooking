@@ -78,7 +78,7 @@
 else
 {
     <div class="row g-3">
-        @foreach (var b in Model.OrderByDescending(x => x.StartAtUtc))
+        @foreach (var b in Model.OrderBy(x => x.StartAtUtc))
         {
             var startLocal = b.StartAtUtc.ToLocalTime();
             var endLocal = b.EndAtUtc.ToLocalTime();

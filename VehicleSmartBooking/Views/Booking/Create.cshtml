@@ -23,26 +23,9 @@
         </div>
     </div>
 
-    <!-- Booking Type Selector -->
-    <div class="vb-card p-3 p-md-4 mb-3">
-        <div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-2">
-            <div class="fw-semibold">ประเภทการจอง</div>
-            <div class="vb-toggle">
-                <button type="button" class="vb-toggle-btn is-active" data-vb-booking="in">
-                    ในจังหวัด
-                </button>
-                <button type="button" class="vb-toggle-btn" data-vb-booking="out">
-                    ต่างจังหวัด
-                </button>
-            </div>
-        </div>
-
-    </div>
-
     <!-- ===== Form Wrapper ===== -->
     <form method="post" enctype="multipart/form-data" class="vb-form needs-validation" id="vbForm" novalidate>
-        <!-- Hidden to know selected mode -->
-        <input type="hidden" name="BookingMode" id="BookingMode" value="in" />
+        <!-- Hidden to know selected service option (personal/external), set reactively via modal -->
         <input type="hidden" name="ServiceOption" id="ServiceOption" value="" />
 
         @if (!ViewData.ModelState.IsValid)
@@ -107,6 +90,29 @@
                 </div>
             </div>
 
+            <!-- Booking Type (moved here so it's seen first, right before Vehicle Type, since it
+                 drives the vehicle-type options / approval scenario / validation below) -->
+            <div class="mb-4">
+                <label class="form-label fw-semibold">
+                    ประเภทการจอง <span class="text-danger">*</span>
+                </label>
+
+                <input type="hidden" name="BookingMode" id="BookingMode" value="in" />
+
+                <div class="row g-2 g-md-3">
+                    <div class="col-6">
+                        <button type="button" class="vb-toggle-btn w-100 is-active" data-vb-booking="in">
+                            ในจังหวัด
+                        </button>
+                    </div>
+                    <div class="col-6">
+                        <button type="button" class="vb-toggle-btn w-100" data-vb-booking="out">
+                            ต่างจังหวัด
+                        </button>
+                    </div>
+                </div>
+            </div>
+
             <!-- Vehicle Type with preview -->
             <div class="mb-3">
                 <label class="form-label">ประเภทรถ <span class="text-danger">*</span></label>
@@ -121,7 +127,7 @@
                                      asp-append-version="true"
                                      alt="รถกระบะ" />
                             </div>
-                            <div class="vb-veh-name">รถกระบะ</div>
+                            <div class="vb-veh-name">รถกระบะ (พร้อมพนักงานขับรถ)</div>
                             <div class="vb-veh-sub">เหมาะกับงานขนของ/ไซต์งาน</div>
                         </label>
                     </div>
@@ -135,7 +141,7 @@
                                      asp-append-version="true"
                                      alt="รถตู้" />
                             </div>
-                            <div class="vb-veh-name">รถตู้</div>
+                            <div class="vb-veh-name">รถตู้ (พร้อมพนักงานขับรถ)</div>
                             <div class="vb-veh-sub">เหมาะกับหลายคน/เดินทางไกล</div>
                         </label>
                     </div>
@@ -163,7 +169,7 @@
                                      asp-append-version="true"
                                      alt="รถไฟฟ้า" />
                             </div>
-                            <div class="vb-veh-name">รถไฟฟ้า</div>
+                            <div class="vb-veh-name">รถไฟฟ้า (ไม่มีพนักงานขับรถ)</div>
                             <div class="vb-veh-sub">เหมาะกับงานทั่วไป/พบลูกค้า</div>
                         </label>
                     </div>
@@ -183,13 +189,15 @@
 
                 <div class="col-12 col-md-4">
                     <label class="form-label">วันที่ เวลา เริ่มต้น <span class="text-danger">*</span></label>
-                    <input type="datetime-local" class="form-control" name="StartAt" required />
-                    <div class="invalid-feedback">กรุณาเลือกวันเวลาเริ่มต้น</div>
+                    <input type="datetime-local" class="form-control" name="StartAt" id="StartAt"
+                           min="@DateTime.Now.ToString("yyyy-MM-ddTHH:mm")" required />
+                    <div class="invalid-feedback">กรุณาเลือกวันเวลาเริ่มต้น (ไม่ย้อนหลัง)</div>
                 </div>
 
                 <div class="col-12 col-md-4">
                     <label class="form-label">วันที่ เวลา สิ้นสุด <span class="text-danger">*</span></label>
-                    <input type="datetime-local" class="form-control" name="EndAt" required />
+                    <input type="datetime-local" class="form-control" name="EndAt" id="EndAt"
+                           min="@DateTime.Now.ToString("yyyy-MM-ddTHH:mm")" required />
                     <div class="invalid-feedback">กรุณาเลือกวันเวลาสิ้นสุด</div>
                 </div>
 
@@ -238,9 +246,13 @@
                 </div>
 
                 <div class="col-12">
-                    <label class="form-label">แนบเอกสารเพิ่มเติม (ถ้ามี)</label>
-                    <input type="file" class="form-control" name="Attachments" multiple />
+                    <label class="form-label">
+                        แนบเอกสารเพิ่มเติม (รายชื่อคนที่ไป, แผนที่)
+                        <span class="text-danger d-none" id="attachmentsRequiredMark">*</span>
+                    </label>
+                    <input type="file" class="form-control" name="Attachments" id="Attachments" multiple />
                     <div class="form-text">รองรับแนบได้หลายไฟล์</div>
+                    <div class="invalid-feedback">กรุณาแนบเอกสารเพิ่มเติม (บังคับสำหรับการจองต่างจังหวัด)</div>
                 </div>
             </div>
 
@@ -350,9 +362,69 @@
                 vehicleTypeInputs.forEach(el => el.classList.toggle("is-invalid", !hasValue));
             };
 
-            vehicleTypeInputs.forEach(el => el.addEventListener("change", updateVehicleTypeFeedback));
+            // Prevent picking a start time in the past and keep end >= start
+            const startInput = document.getElementById("StartAt");
+            const endInput = document.getElementById("EndAt");
+            const pad = (n) => String(n).padStart(2, "0");
+            const nowLocal = () => {
+                const d = new Date();
+                return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+            };
+
+            const isElectricSelected = () => vehicleTypeInputs.some(el => el.checked && el.value === "electric");
+
+            // Electric vehicles must start and end on the same calendar day: cap the end input's
+            // selectable range to the start date's day so other days cannot be entered.
+            const applyEndDayLock = () => {
+                if (!endInput) return;
+                if (isElectricSelected() && startInput && startInput.value) {
+                    const day = startInput.value.slice(0, 10); // YYYY-MM-DD
+                    endInput.min = startInput.value;            // not before start
+                    endInput.max = day + "T23:59";              // same day only
+                    if (endInput.value && endInput.value.slice(0, 10) !== day) {
+                        endInput.value = "";                    // clear a stale different-day value
+                    }
+                } else {
+                    endInput.removeAttribute("max");            // no same-day cap for other vehicles
+                }
+            };
+
+            const refreshMin = () => {
+                const min = nowLocal();
+                if (startInput) startInput.min = min;
+                if (endInput) endInput.min = (startInput && startInput.value) ? startInput.value : min;
+                applyEndDayLock();
+            };
+
+            vehicleTypeInputs.forEach(el => el.addEventListener("change", () => {
+                updateVehicleTypeFeedback();
+                applyEndDayLock();
+            }));
+
+            if (startInput) {
+                startInput.addEventListener("change", () => {
+                    if (endInput && startInput.value) {
+                        endInput.min = startInput.value;
+                        if (endInput.value && endInput.value < startInput.value) endInput.value = "";
+                    }
+                    applyEndDayLock();
+                });
+            }
+            refreshMin();
 
             form.addEventListener("submit", (event) => {
+                refreshMin();
+
+                // Electric vehicles cannot be booked across calendar days (judged by date, not 24h).
+                const evChecked = vehicleTypeInputs.some(el => el.checked && el.value === "electric");
+                if (evChecked && startInput && endInput && startInput.value && endInput.value
+                    && startInput.value.slice(0, 10) !== endInput.value.slice(0, 10)) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    alert("รถไฟฟ้าไม่สามารถจองข้ามวันได้ กรุณาเลือกวันเริ่มต้นและวันสิ้นสุดให้เป็นวันเดียวกัน");
+                    return;
+                }
+
                 if (!form.checkValidity()) {
                     event.preventDefault();
                     event.stopPropagation();

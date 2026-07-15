@@ -1,0 +1,430 @@
+@using System.Collections.Generic
+@using VehicleBooking.Web.Domain.Enums
+@model VehicleSmartBooking.Controllers.AdminController.DriverDetailVm
+
+@{
+    Layout = "_VehicleBookingLayout";
+    ViewData["Title"] = "Driver Detail";
+    ViewData["ActiveNav"] = "AdminDrivers";
+
+    string StatusClass(BookingStatus st) => VehicleBooking.Web.Domain.Helpers.BookingStatusHelper.StatusCssClass(st);
+
+    string StatusText(BookingStatus st) => st switch
+    {
+        BookingStatus.Draft => "ร่าง",
+        BookingStatus.Submitted => "ส่งคำขอแล้ว",
+        BookingStatus.WaitingApproval => "รออนุมัติ",
+        BookingStatus.WaitingDriverAccept => "รอพนักงานขับรถตอบรับ",
+        BookingStatus.DriverAccepted => "พนักงานขับรถตอบรับ",
+        BookingStatus.ApprovedSelfDrive => "อนุมัติแล้ว",
+        BookingStatus.WaitingAdminVendorQuotation => "รอเสนอราคาผู้ให้บริการ",
+        BookingStatus.WaitingUserVendorAccept => "รอผู้ขอใช้ยอมรับผู้ให้บริการ",
+        BookingStatus.WaitingAdminVendorConfirm => "รอยืนยันผู้ให้บริการ",
+        BookingStatus.VendorRejectedByUser => "ผู้ขอใช้ปฏิเสธผู้ให้บริการ",
+        BookingStatus.WaitingAdminPersonal => "รอผู้ดูแลอนุมัติรถส่วนตัว",
+        BookingStatus.Completed => "เสร็จสิ้น",
+        BookingStatus.Rated => "ให้คะแนนแล้ว",
+        BookingStatus.Rejected => "ถูกปฏิเสธ",
+        BookingStatus.Cancelled => "ยกเลิก",
+        BookingStatus.AdminActionRequired => "รอผู้ดูแลดำเนินการ",
+        _ => st.ToString()
+    };
+
+    string TripChipText(TripType t) => t switch
+    {
+        TripType.InProvince => "ในจังหวัด",
+        TripType.OutProvince => "นอกจังหวัด",
+        _ => t.ToString()
+    };
+
+    string TripChipClass(TripType t) => t == TripType.OutProvince ? "vb-chip vb-chip-alt" : "vb-chip";
+
+    var statusOptions = new[]
+    {
+        BookingStatus.Submitted,
+        BookingStatus.WaitingApproval,
+        BookingStatus.WaitingDriverAccept,
+        BookingStatus.DriverAccepted,
+        BookingStatus.ApprovedSelfDrive,
+        BookingStatus.WaitingAdminVendorQuotation,
+        BookingStatus.WaitingUserVendorAccept,
+        BookingStatus.WaitingAdminVendorConfirm,
+        BookingStatus.VendorRejectedByUser,
+        BookingStatus.WaitingAdminPersonal,
+        BookingStatus.Completed,
+        BookingStatus.Rated,
+        BookingStatus.Rejected,
+        BookingStatus.Cancelled,
+        BookingStatus.AdminActionRequired
+    };
+
+    string StarsHtml(double avg)
+    {
+        var full = (int)Math.Floor(avg);
+        var hasHalf = (avg - full) >= 0.5;
+        var sb = new System.Text.StringBuilder();
+        for (var i = 0; i < 5; i++)
+        {
+            if (i < full) sb.Append("<i class=\"bi bi-star-fill text-warning\"></i>");
+            else if (i == full && hasHalf) sb.Append("<i class=\"bi bi-star-half text-warning\"></i>");
+            else sb.Append("<i class=\"bi bi-star text-warning\"></i>");
+        }
+        return sb.ToString();
+    }
+
+    // Route values shared by every pagination link so search/filters (and the driver id) are
+    // never lost when navigating between pages. Only "page" changes per link.
+    Dictionary<string, string> PageRouteValues(int targetPage) => new()
+    {
+        ["id"] = Model.DriverId.ToString(),
+        ["search"] = Model.Search ?? "",
+        ["status"] = Model.Status?.ToString() ?? "",
+        ["tripType"] = Model.TripType?.ToString() ?? "",
+        ["serviceType"] = Model.ServiceType ?? "",
+        ["startDate"] = Model.StartDate?.ToString("yyyy-MM-dd") ?? "",
+        ["endDate"] = Model.EndDate?.ToString("yyyy-MM-dd") ?? "",
+        ["pageSize"] = Model.PageSize.ToString(),
+        ["page"] = targetPage.ToString()
+    };
+}
+
+<div class="vb-page-head vb-page-hero mb-4">
+    <div class="vb-page-title">
+        <div class="vb-page-icon">
+            <img src="~/img/driver.png" asp-append-version="true" class="vb-page-icon-img" />
+        </div>
+        <div>
+            <h1 class="vb-page-h1">@Model.DriverName</h1>
+            <div class="vb-page-sub">รายละเอียดพนักงานขับรถ</div>
+        </div>
+    </div>
+
+    <div class="vb-page-meta d-none d-md-flex">
+        <a asp-action="Drivers" class="btn btn-light btn-sm">
+            <i class="bi bi-arrow-left"></i> กลับไปหน้า Drivers
+        </a>
+    </div>
+</div>
+
+<div class="d-md-none mb-3">
+    <a asp-action="Drivers" class="btn btn-light btn-sm">
+        <i class="bi bi-arrow-left"></i> กลับไปหน้า Drivers
+    </a>
+</div>
+
+@if (TempData["Error"] is string errMsg && !string.IsNullOrWhiteSpace(errMsg))
+{
+    <div class="alert alert-danger alert-dismissible mb-3" role="alert">
+        @errMsg
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+}
+
+<!-- Driver info card -->
+<div class="vb-card p-3 p-md-4 mb-3">
+    <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-3">
+        <div class="fw-semibold fs-5">ข้อมูลพนักงานขับรถ</div>
+        <span class="badge @(Model.IsActive ? "bg-success" : "bg-secondary")">
+            @(Model.IsActive ? "Active" : "Inactive")
+        </span>
+    </div>
+
+    <div class="row g-3">
+        <div class="col-6 col-md-3">
+            <div class="text-muted small">Driver Code</div>
+            <div class="fw-semibold">@(Model.UserCode ?? "-")</div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="text-muted small">ชื่อ (TH)</div>
+            <div class="fw-semibold">@Model.DriverName</div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="text-muted small">เบอร์โทรศัพท์</div>
+            <div class="fw-semibold">@(Model.PhoneNo ?? "-")</div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="text-muted small">รถประจำตัว</div>
+            <div class="fw-semibold">@(Model.PlateNo ?? "-")</div>
+        </div>
+    </div>
+</div>
+
+<!-- Rating summary card -->
+<div class="vb-card p-3 p-md-4 mb-3">
+    <div class="fw-semibold fs-5 mb-3">สรุปคะแนนประเมิน (Rating)</div>
+
+    @if (Model.RatingCount == 0)
+    {
+        <div class="text-muted">ยังไม่มีข้อมูลการประเมินพนักงานขับรถ</div>
+    }
+    else
+    {
+        <div class="row g-3">
+            <div class="col-12 col-md-4">
+                <div class="text-muted small">คะแนนเฉลี่ย</div>
+                <div class="fs-4 fw-bold">
+                    @Model.AverageRating!.Value.ToString("0.0") / 5
+                </div>
+                <div>@Html.Raw(StarsHtml(Model.AverageRating!.Value))</div>
+            </div>
+            <div class="col-6 col-md-2">
+                <div class="text-muted small">จำนวนครั้ง</div>
+                <div class="fw-semibold fs-5">@Model.RatingCount</div>
+            </div>
+            <div class="col-6 col-md-2">
+                <div class="text-muted small">คะแนนสูงสุด</div>
+                <div class="fw-semibold fs-5">@Model.HighestRating!.Value.ToString("0.0")</div>
+            </div>
+            <div class="col-6 col-md-2">
+                <div class="text-muted small">คะแนนต่ำสุด</div>
+                <div class="fw-semibold fs-5">@Model.LowestRating!.Value.ToString("0.0")</div>
+            </div>
+            <div class="col-6 col-md-2">
+                <div class="text-muted small">งานเสร็จสิ้น</div>
+                <div class="fw-semibold fs-5">@Model.CompletedJobCount</div>
+            </div>
+        </div>
+
+        @if (Model.RecentRatings.Count > 0)
+        {
+            <hr class="my-3" />
+            <div class="fw-semibold mb-2">ความคิดเห็นล่าสุด (5 ใบงานล่าสุด)</div>
+            <div class="d-flex flex-column gap-2">
+                @foreach (var r in Model.RecentRatings)
+                {
+                    <div class="border rounded p-2 p-md-3">
+                        <div class="d-flex justify-content-between flex-wrap gap-2">
+                            <div class="small text-muted">
+                                Booking ID : VS-@r.BookingId
+                                &middot; ผู้ประเมิน: @(r.EvaluatorName ?? "-")
+                            </div>
+                            <div class="small text-muted">@r.RatedAtDisplay</div>
+                        </div>
+                        <div class="fw-semibold mt-1">@r.Score.ToString("0.0") / 5</div>
+                        @if (!string.IsNullOrWhiteSpace(r.Comment))
+                        {
+                            <div class="small mt-1" style="word-break:break-word;">@r.Comment</div>
+                        }
+                    </div>
+                }
+            </div>
+        }
+    }
+</div>
+
+<!-- Filters + Search (server-side, mirrors Admin/AllBookings) -->
+<div class="vb-card p-3 p-md-4 mb-3">
+    <form method="get" asp-action="DriverDetail" class="row g-3 align-items-end mb-0">
+        <input type="hidden" name="id" value="@Model.DriverId" />
+
+        <div class="col-12">
+            <label class="form-label">ค้นหา</label>
+            <input type="text" class="form-control" name="search" value="@Model.Search"
+                   placeholder="ค้นหาเลขที่ใบจอง ชื่อผู้ขอ เส้นทาง หรือทะเบียนรถ" />
+        </div>
+
+        <div class="col-12 col-md-4">
+            <label class="form-label">สถานะ</label>
+            <select class="form-select" name="status">
+                <option value="" selected="@(Model.Status is null ? "selected" : null)">ทั้งหมด</option>
+                @foreach (var s in statusOptions)
+                {
+                    <option value="@s" selected="@(Model.Status == s ? "selected" : null)">@StatusText(s)</option>
+                }
+            </select>
+        </div>
+
+        <div class="col-12 col-md-4">
+            <label class="form-label">ประเภทการเดินทาง</label>
+            <select class="form-select" name="tripType">
+                <option value="" selected="@(Model.TripType is null ? "selected" : null)">ทั้งหมด</option>
+                <option value="@TripType.InProvince" selected="@(Model.TripType == TripType.InProvince ? "selected" : null)">รถในจังหวัด</option>
+                <option value="@TripType.OutProvince" selected="@(Model.TripType == TripType.OutProvince ? "selected" : null)">รถนอกจังหวัด</option>
+            </select>
+        </div>
+
+        <div class="col-12 col-md-4">
+            <label class="form-label">ประเภทบริการ</label>
+            <select class="form-select" name="serviceType">
+                <option value="" selected="@(string.IsNullOrEmpty(Model.ServiceType) ? "selected" : null)">ทั้งหมด</option>
+                <option value="company" selected="@(Model.ServiceType == "company" ? "selected" : null)">รถในบริษัท</option>
+                <option value="external" selected="@(Model.ServiceType == "external" ? "selected" : null)">รถภายนอกบริษัท</option>
+                <option value="personal" selected="@(Model.ServiceType == "personal" ? "selected" : null)">รถส่วนตัว</option>
+            </select>
+        </div>
+
+        <div class="col-6 col-md-3">
+            <label class="form-label">วันที่เริ่มต้น</label>
+            <input type="date" class="form-control" name="startDate" value="@(Model.StartDate?.ToString("yyyy-MM-dd"))" />
+        </div>
+
+        <div class="col-6 col-md-3">
+            <label class="form-label">วันที่สิ้นสุด</label>
+            <input type="date" class="form-control" name="endDate" value="@(Model.EndDate?.ToString("yyyy-MM-dd"))" />
+        </div>
+
+        <div class="col-12 col-md-6 d-grid d-flex gap-2 justify-content-md-end">
+            <button type="submit" class="btn btn-primary">
+                <i class="bi bi-search"></i> ค้นหารายงาน
+            </button>
+            <a asp-action="DriverDetail" asp-route-id="@Model.DriverId" class="btn btn-light">ล้างตัวกรอง</a>
+        </div>
+    </form>
+</div>
+
+<!-- Assigned bookings -->
+<div class="vb-card p-0 d-none d-md-block">
+    <div class="vb-table-head px-3 px-md-4 py-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <div class="fw-semibold">งานที่ได้รับมอบหมาย</div>
+        <div class="text-muted small">พบทั้งหมด @Model.TotalCount รายการ</div>
+    </div>
+
+    <div class="table-responsive">
+        <table class="table vb-table mb-0">
+            <thead>
+                <tr>
+                    <th style="width:120px;">Booking #</th>
+                    <th style="width:140px;">ประเภท</th>
+                    <th style="width:300px;">ผู้ขอใช้รถ</th>
+                    <th style="min-width:220px;">เส้นทาง</th>
+                    <th style="width:210px;">ช่วงเวลา</th>
+                    <th style="width:180px;">สถานะ</th>
+                    <th style="width:90px;" class="text-end">การทำงาน</th>
+                </tr>
+            </thead>
+
+            <tbody>
+                @if (Model.Bookings.Count == 0)
+                {
+                    <tr>
+                        <td colspan="9" class="text-center text-muted py-4">ไม่พบรายการที่ตรงกับตัวกรอง</td>
+                    </tr>
+                }
+                else
+                {
+                    foreach (var b in Model.Bookings)
+                    {
+                        <tr>
+                            <td class="fw-semibold">
+                                VS-@b.BookingId
+                            </td>
+                            <td>
+                                <span class="@TripChipClass(b.TripType)">@TripChipText(b.TripType)</span>
+                                <div class="text-muted small mt-1">@(!string.IsNullOrWhiteSpace(b.JobNo) ? b.JobNo : "-")</div>
+                            </td>
+                            <td title="@b.RequesterName">@(b.RequesterName ?? "-")</td>
+                            <td>
+                                <div title="@b.PickupDisplay"><span class="fw-semibold">จุดเริ่มต้น:</span> @b.PickupDisplay</div>
+                                <div title="@b.DestinationDisplay"><span class="fw-semibold">จุดสิ้นสุด:</span> @b.DestinationDisplay</div>
+                            </td>
+                            <td>
+                                <div><span class="fw-semibold">เริ่ม:</span> @b.StartDisplay</div>
+                                <div><span class="fw-semibold">สิ้นสุด:</span> @b.EndDisplay</div>
+                            </td>
+                            <td><span class="vb-status @StatusClass(b.Status)">@StatusText(b.Status)</span></td>
+                            <td class="text-end">
+                                <a asp-action="Detail" asp-route-id="@b.BookingId" class="btn btn-sm btn-outline-secondary">
+                                    <i class="bi bi-eye"></i>
+                                </a>
+                            </td>
+                        </tr>
+                    }
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Mobile cards -->
+<div class="d-md-none">
+    <div class="text-muted small mb-2">พบทั้งหมด @Model.TotalCount รายการ</div>
+
+    @if (Model.Bookings.Count == 0)
+    {
+        <div class="vb-card p-3 text-center text-muted">ไม่พบรายการที่ตรงกับตัวกรอง</div>
+    }
+    else
+    {
+        foreach (var b in Model.Bookings)
+        {
+            <div class="vb-history-card vb-card p-3 mb-3">
+                <div class="d-flex justify-content-between align-items-start gap-2">
+                    <div class="fw-semibold">VS-@b.BookingId</div>
+                    <span class="vb-status @StatusClass(b.Status)">@StatusText(b.Status)</span>
+                </div>
+
+                <div class="mt-1 small text-muted">Job No. @(!string.IsNullOrWhiteSpace(b.JobNo) ? b.JobNo : "-") &middot; @(b.RequesterName ?? "-")</div>
+
+                <div class="mt-2 small">
+                    <div title="@b.PickupDisplay"><span class="fw-semibold">จุดเริ่มต้น:</span> @b.PickupDisplay</div>
+                    <div title="@b.DestinationDisplay"><span class="fw-semibold">จุดสิ้นสุด:</span> @b.DestinationDisplay</div>
+                </div>
+
+                <div class="mt-2 small text-muted">
+                    <div><span class="fw-semibold">เริ่ม:</span> @b.StartDisplay</div>
+                    <div><span class="fw-semibold">สิ้นสุด:</span> @b.EndDisplay</div>
+                </div>
+
+                <div class="d-flex justify-content-between align-items-center mt-3">
+                    <span class="@TripChipClass(b.TripType)">@TripChipText(b.TripType)</span>
+                    <div class="d-flex align-items-center gap-2">
+                        @if (b.RatingScore.HasValue)
+                        {
+                            <span class="small text-muted">@b.RatingScore.Value.ToString("0.0")/5</span>
+                        }
+                        <a asp-action="Detail" asp-route-id="@b.BookingId" class="btn btn-sm btn-outline-secondary">
+                            <i class="bi bi-eye"></i>
+                        </a>
+                    </div>
+                </div>
+            </div>
+        }
+    }
+</div>
+
+@if (Model.TotalPages > 1)
+{
+    <nav class="mt-3" aria-label="Driver bookings pagination">
+        <div class="text-muted small mb-2 text-center text-md-start">
+            หน้า @Model.Page จาก @Model.TotalPages (ทั้งหมด @Model.TotalCount รายการ)
+        </div>
+        <ul class="pagination pagination-sm justify-content-center justify-content-md-start flex-wrap mb-0">
+            <li class="page-item @(Model.Page <= 1 ? "disabled" : "")">
+                <a class="page-link" asp-action="DriverDetail" asp-all-route-data="@PageRouteValues(Model.Page - 1)">ก่อนหน้า</a>
+            </li>
+
+            @{
+                var startPage = Math.Max(1, Model.Page - 2);
+                var endPage = Math.Min(Model.TotalPages, Model.Page + 2);
+            }
+            @if (startPage > 1)
+            {
+                <li class="page-item"><a class="page-link" asp-action="DriverDetail" asp-all-route-data="@PageRouteValues(1)">1</a></li>
+                @if (startPage > 2)
+                {
+                    <li class="page-item disabled"><span class="page-link">…</span></li>
+                }
+            }
+
+            @for (var i = startPage; i <= endPage; i++)
+            {
+                <li class="page-item @(i == Model.Page ? "active" : "")">
+                    <a class="page-link" asp-action="DriverDetail" asp-all-route-data="@PageRouteValues(i)">@i</a>
+                </li>
+            }
+
+            @if (endPage < Model.TotalPages)
+            {
+                @if (endPage < Model.TotalPages - 1)
+                {
+                    <li class="page-item disabled"><span class="page-link">…</span></li>
+                }
+                <li class="page-item"><a class="page-link" asp-action="DriverDetail" asp-all-route-data="@PageRouteValues(Model.TotalPages)">@Model.TotalPages</a></li>
+            }
+
+            <li class="page-item @(Model.Page >= Model.TotalPages ? "disabled" : "")">
+                <a class="page-link" asp-action="DriverDetail" asp-all-route-data="@PageRouteValues(Model.Page + 1)">ถัดไป</a>
+            </li>
+        </ul>
+    </nav>
+}

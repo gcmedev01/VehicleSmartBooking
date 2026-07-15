@@ -92,33 +92,33 @@
 
 <div class="vb-card p-3 p-md-4 mb-3 dashboard-filter-bar">
     <form method="get" class="row g-2 align-items-end">
-        <div class="col-6 col-lg-2">
-            <label class="form-label">Date From</label>
+        <div class="col-6 col-md-3">
+            <label class="form-label">วันที่เริ่มต้น</label>
             <input type="date" class="form-control" asp-for="Filters.DateFrom" />
         </div>
-        <div class="col-6 col-lg-2">
-            <label class="form-label">Date To</label>
+        <div class="col-6 col-md-3">
+            <label class="form-label">วันที่สิ้นสุด</label>
             <input type="date" class="form-control" asp-for="Filters.DateTo" />
         </div>
-        <div class="col-6 col-lg-2">
-            <label class="form-label">Division</label>
-            <select class="form-select" asp-for="Filters.Div" asp-items="@(new SelectList(Model.FilterOptions.DivOptions))">
-                <option value="">ทั้งหมด</option>
-            </select>
-        </div>
-        <div class="col-6 col-lg-2">
-            <label class="form-label">Department</label>
-            <select class="form-select" asp-for="Filters.Dept" asp-items="@(new SelectList(Model.FilterOptions.DeptOptions))">
-                <option value="">ทั้งหมด</option>
-            </select>
-        </div>
-        <div class="col-6 col-lg-2">
-            <label class="form-label">Function</label>
+        <div class="col-4 col-md-2">
+            <label class="form-label">ฝ่าย</label>
             <select class="form-select" asp-for="Filters.Function" asp-items="@(new SelectList(Model.FilterOptions.FunctionOptions))">
                 <option value="">ทั้งหมด</option>
             </select>
         </div>
-        <div class="col-6 col-lg-2">
+        <div class="col-4 col-md-2">
+            <label class="form-label">ส่วน</label>
+            <select class="form-select" asp-for="Filters.Dept" asp-items="@(new SelectList(Model.FilterOptions.DeptOptions))">
+                <option value="">ทั้งหมด</option>
+            </select>
+        </div>
+        <div class="col-4 col-md-2">
+            <label class="form-label">แผนก</label>
+            <select class="form-select" asp-for="Filters.Div" asp-items="@(new SelectList(Model.FilterOptions.DivOptions))">
+                <option value="">ทั้งหมด</option>
+            </select>
+        </div>
+        <div class="col-6">
             <label class="form-label">Mode</label>
             <select class="form-select" asp-for="Filters.Mode">
                 <option value="">ทั้งหมด</option>
@@ -127,26 +127,26 @@
                 <option value="personal">รถส่วนตัว</option>
             </select>
         </div>
-        <div class="col-6 col-lg-2">
+        <div class="col-6">
             <label class="form-label">Trip Scope</label>
             <select class="form-select" asp-for="Filters.TripScope" asp-items="tripOptions">
                 <option value="">ทั้งหมด</option>
             </select>
         </div>
-        <div class="col-6 col-lg-2">
+        <div class="col-6">
             <label class="form-label">Vehicle Type</label>
             <select class="form-select" asp-for="Filters.VehicleTypeRequested" asp-items="vehicleOptions">
                 <option value="">ทั้งหมด</option>
             </select>
         </div>
-        <div class="col-6 col-lg-2">
+        <div class="col-6">
             <label class="form-label">Status</label>
             <select class="form-select" asp-for="Filters.Status" asp-items="statusOptions">
                 <option value="">ทั้งหมด</option>
             </select>
         </div>
-        <div class="col-12 col-lg-2">
-            <button type="submit" class="btn btn-ci w-100">Apply Filters</button>
+        <div class="col-12 text-md-end text-center mt-3">
+            <button type="submit" class="btn btn-ci" style="width:150px;">Apply</button>
         </div>
     </form>
 </div>

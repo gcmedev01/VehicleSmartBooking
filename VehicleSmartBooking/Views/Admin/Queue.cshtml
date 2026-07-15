@@ -261,7 +261,7 @@
                         block.className = "vb-queue-slot";
                         block.style.cursor = "pointer";
                         block.addEventListener("click", () => {
-                            window.open(`/Admin/Detail/${slot.bookingId}`, "_blank");
+                            window.open(`${window.appBasePath || "/"}Admin/Detail/${slot.bookingId}`, "_blank");
                         });
 
                         const typeColor = slot.type === "Pickup" ? "rgba(11,94,215,.12)" :

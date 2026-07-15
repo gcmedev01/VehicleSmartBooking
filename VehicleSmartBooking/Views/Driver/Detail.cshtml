@@ -154,7 +154,7 @@
                     @foreach (var a in Model.Attachments)
                     {
                         <li class="mb-1">
-                            <a href="@a.StoragePath" target="_blank">@a.FileName</a>
+                            <a href="@(Url.Content("~" + a.StoragePath))" target="_blank">@a.FileName</a>
                         </li>
                     }
                 </ul>
@@ -333,8 +333,8 @@
                 <div class="d-flex flex-wrap gap-2">
                     @foreach (var photo in groupPhotos)
                     {
-                        <a href="@photo.RelativePath" target="_blank" title="@photo.OriginalFileName">
-                            <img src="@photo.RelativePath" alt="@photo.OriginalFileName"
+                        <a href="@(Url.Content("~" + photo.RelativePath))" target="_blank" title="@photo.OriginalFileName">
+                            <img src="@(Url.Content("~" + photo.RelativePath))" alt="@photo.OriginalFileName"
                                  style="height:90px;width:90px;object-fit:cover;border-radius:6px;border:1px solid #dee2e6;" />
                         </a>
                     }

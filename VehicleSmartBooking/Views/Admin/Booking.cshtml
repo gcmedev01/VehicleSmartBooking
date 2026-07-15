@@ -13,43 +13,43 @@
 
     string TripText(TripType t) => t switch
     {
-        TripType.InProvince => "ã¹¨Ñ§ËÇÑ´",
-        TripType.OutProvince => "¹Í¡¨Ñ§ËÇÑ´",
+        TripType.InProvince => "ã¹¨Ñ§ï¿½ï¿½Ñ´",
+        TripType.OutProvince => "ï¿½Í¡ï¿½Ñ§ï¿½ï¿½Ñ´",
         _ => t.ToString()
     };
 
     string VehicleText(VehicleType v) => v switch
     {
-        VehicleType.Pickup => "Ã¶¡ÃÐºÐ",
-        VehicleType.Van => "Ã¶µÙé",
-        VehicleType.Sedan => "Ã¶à¡ë§",
+        VehicleType.Pickup => "Ã¶ï¿½ï¿½Ðºï¿½",
+        VehicleType.Van => "Ã¶ï¿½ï¿½ï¿½",
+        VehicleType.Sedan => "Ã¶ï¿½ï¿½",
         _ => v.ToString()
     };
 
     string StatusText(BookingStatus st) => st switch
     {
-        BookingStatus.Draft => "ÃèÒ§",
-        BookingStatus.Submitted => "Êè§¤Ó¢ÍáÅéÇ",
-        BookingStatus.WaitingApproval => "ÃÍÍ¹ØÁÑµÔ",
-        BookingStatus.WaitingDriverAccept => "ÃÍ¾¹Ñ¡§Ò¹¢ÑºÃ¶µÍºÃÑº",
-        BookingStatus.DriverAccepted => "¾¹Ñ¡§Ò¹¢ÑºÃ¶µÍºÃÑº",
-        BookingStatus.WaitingAdminVendorQuotation => "ÃÍàÊ¹ÍÃÒ¤Ò¼ÙéãËéºÃÔ¡ÒÃ",
-        BookingStatus.WaitingUserVendorAccept => "ÃÍ¼Ùé¢ÍãªéÂÍÁÃÑº¼ÙéãËéºÃÔ¡ÒÃ",
-        BookingStatus.WaitingAdminVendorConfirm => "ÃÍÂ×¹ÂÑ¹¼ÙéãËéºÃÔ¡ÒÃ",
-        BookingStatus.VendorRejectedByUser => "¼Ùé¢Íãªé»¯ÔàÊ¸¼ÙéãËéºÃÔ¡ÒÃ",
-        BookingStatus.Completed => "àÊÃç¨ÊÔé¹",
-        BookingStatus.Rated => "ãËé¤Ðá¹¹áÅéÇ",
-        BookingStatus.Rejected => "¶Ù¡»¯ÔàÊ¸",
-        BookingStatus.Cancelled => "Â¡àÅÔ¡",
-        BookingStatus.AdminActionRequired => "ÃÍ¼Ùé´ÙáÅ´Óà¹Ô¹¡ÒÃ",
+        BookingStatus.Draft => "ï¿½ï¿½Ò§",
+        BookingStatus.Submitted => "ï¿½è§¤Ó¢ï¿½ï¿½ï¿½ï¿½ï¿½",
+        BookingStatus.WaitingApproval => "ï¿½ï¿½Í¹ï¿½ï¿½Ñµï¿½",
+        BookingStatus.WaitingDriverAccept => "ï¿½Í¾ï¿½Ñ¡ï¿½Ò¹ï¿½ÑºÃ¶ï¿½Íºï¿½Ñº",
+        BookingStatus.DriverAccepted => "ï¿½ï¿½Ñ¡ï¿½Ò¹ï¿½ÑºÃ¶ï¿½Íºï¿½Ñº",
+        BookingStatus.WaitingAdminVendorQuotation => "ï¿½ï¿½ï¿½Ê¹ï¿½ï¿½Ò¤Ò¼ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ô¡ï¿½ï¿½",
+        BookingStatus.WaitingUserVendorAccept => "ï¿½Í¼ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ñºï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ô¡ï¿½ï¿½",
+        BookingStatus.WaitingAdminVendorConfirm => "ï¿½ï¿½ï¿½×¹ï¿½Ñ¹ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ô¡ï¿½ï¿½",
+        BookingStatus.VendorRejectedByUser => "ï¿½ï¿½ï¿½ï¿½ï¿½é»¯ï¿½ï¿½Ê¸ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ô¡ï¿½ï¿½",
+        BookingStatus.Completed => "ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½",
+        BookingStatus.Rated => "ï¿½ï¿½ï¿½ï¿½á¹¹ï¿½ï¿½ï¿½ï¿½",
+        BookingStatus.Rejected => "ï¿½Ù¡ï¿½ï¿½ï¿½ï¿½Ê¸",
+        BookingStatus.Cancelled => "Â¡ï¿½ï¿½Ô¡",
+        BookingStatus.AdminActionRequired => "ï¿½Í¼ï¿½ï¿½ï¿½ï¿½Å´ï¿½ï¿½Ô¹ï¿½ï¿½ï¿½",
         _ => st.ToString()
     };
 
     string ApprovalStatusText(ApprovalStatus st) => st switch
     {
-        ApprovalStatus.Pending => "ÃÍ´Óà¹Ô¹¡ÒÃ",
-        ApprovalStatus.Approved => "Í¹ØÁÑµÔ",
-        ApprovalStatus.Rejected => "äÁèÍ¹ØÁÑµÔ",
+        ApprovalStatus.Pending => "ï¿½Í´ï¿½ï¿½Ô¹ï¿½ï¿½ï¿½",
+        ApprovalStatus.Approved => "Í¹ï¿½ï¿½Ñµï¿½",
+        ApprovalStatus.Rejected => "ï¿½ï¿½ï¿½Í¹ï¿½ï¿½Ñµï¿½",
         _ => st.ToString()
     };
 
@@ -61,7 +61,7 @@
         _ => "bg-secondary"
     };
 
-    // ===== Derived values (¡Ñ¹ Razor à¾ÕéÂ¹) =====
+    // ===== Derived values (ï¿½Ñ¹ Razor ï¿½ï¿½ï¿½Â¹) =====
     var requesterName =
         !string.IsNullOrWhiteSpace(Model.Requester?.UsernameTH)
             ? Model.Requester.UsernameTH
@@ -84,7 +84,7 @@
     var driverText = Model.AssignedDriver != null ? (Model.AssignedDriver.User?.UsernameTH ?? Model.AssignedDriver.User?.UsernameEN ?? $"#{Model.AssignedDriver.DriverId}") : (Model.AssignedDriverId.HasValue ? $"#{Model.AssignedDriverId}" : "-");
     var driverPhone = !string.IsNullOrWhiteSpace(Model.AssignedDriver?.Phone) ? Model.AssignedDriver.Phone : "-";
 
-    var isExternal = Model.IsExternalRental ? "¼ÙéãËéºÃÔ¡ÒÃÀÒÂ¹Í¡" : "Ã¶ºÃÔÉÑ·";
+    var isExternal = Model.IsExternalRental ? "ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ô¡ï¿½ï¿½ï¿½ï¿½Â¹Í¡" : "Ã¶ï¿½ï¿½ï¿½ï¿½Ñ·";
     var tripTypeText = TripText(Model.TripType);
     var vehicleTypeText = VehicleText(Model.VehicleTypeRequested);
     var statusText = StatusText(Model.Status);
@@ -165,15 +165,15 @@
                 <form asp-action="ConfirmVendor" asp-route-id="@Model.BookingId" method="post">
                     @Html.AntiForgeryToken()
                     <div class="mb-2">
-                        <label class="form-label">·ÐàºÕÂ¹Ã¶</label>
+                        <label class="form-label">ï¿½ï¿½ï¿½ï¿½Â¹Ã¶</label>
                         <input name="RentalPlateNo" class="form-control" value="@(Model.ExternalRental?.RentalPlateNo ?? "")" />
                     </div>
                     <div class="mb-2">
-                        <label class="form-label">ÃÒÂª×èÍ¾¹Ñ¡§Ò¹¢ÑºÃ¶</label>
+                        <label class="form-label">ï¿½ï¿½Âªï¿½ï¿½Í¾ï¿½Ñ¡ï¿½Ò¹ï¿½ÑºÃ¶</label>
                         <input name="RentalDriverName" class="form-control" value="@(Model.ExternalRental?.RentalDriverName ?? "")" />
                     </div>
                     <div class="mb-2">
-                        <label class="form-label">àºÍÃìâ·Ã¾¹Ñ¡§Ò¹¢ÑºÃ¶</label>
+                        <label class="form-label">ï¿½ï¿½ï¿½ï¿½ï¿½Ã¾ï¿½Ñ¡ï¿½Ò¹ï¿½ÑºÃ¶</label>
                         <input name="RentalDriverPhone" class="form-control" value="@(Model.ExternalRental?.RentalDriverPhone ?? "")" />
                     </div>
                     <div class="d-flex gap-2 justify-content-end">
@@ -201,7 +201,7 @@
                 <ul class="list-unstyled mb-0">
                     @foreach (var a in Model.Attachments)
                     {
-                        <li class="mb-1"><a href="@a.StoragePath" target="_blank">@a.FileName</a></li>
+                        <li class="mb-1"><a href="@(Url.Content("~" + a.StoragePath))" target="_blank">@a.FileName</a></li>
                     }
                 </ul>
             }

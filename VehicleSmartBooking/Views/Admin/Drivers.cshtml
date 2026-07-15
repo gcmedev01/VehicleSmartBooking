@@ -9,9 +9,9 @@
 
     string VehicleText(VehicleType v) => v switch
     {
-        VehicleType.Pickup => "ö��к�",
-        VehicleType.Van => "ö���",
-        VehicleType.Sedan => "ö��",
+        VehicleType.Pickup => "รถกระบะ",
+        VehicleType.Van => "รถตู้",
+        VehicleType.Sedan => "รถเก๋ง",
         _ => v.ToString()
     };
 }
@@ -59,7 +59,7 @@
                         var vehicleTypeText = d.Vehicle == null ? "" : VehicleText(d.Vehicle.VehicleType);
                         var dotColor = d.IsActive ? "#28a745" : "#adb5bd";
                         var phoneText = string.IsNullOrWhiteSpace(d.Phone) ? "-" : d.Phone;
-                        var outProvinceText = d.CanDriveOutOfProvince ? "��" : "�����";
+                        var outProvinceText = d.CanDriveOutOfProvince ? "ได้" : "ไม่ได้";
                         <tr>
                             <td>@d.User.UserCode</td>
                             <td>@(d.User.UsernameTH ?? d.User.UsernameEN ?? "-")</td>
@@ -71,7 +71,13 @@
                                 <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:@dotColor;"></span>
                             </td>
                             <td class="text-end">
-                                <a asp-action="EditDriver" asp-route-id="@d.DriverId" class="btn btn-sm btn-outline-secondary">Edit</a>
+                                <a asp-action="DriverDetail" asp-route-id="@d.DriverId"
+                                   class="btn btn-sm btn-outline-primary" title="ดูรายละเอียด">
+                                    <i class="bi bi-eye"></i>
+                                </a>
+                                <a asp-action="EditDriver" asp-route-id="@d.DriverId" class="btn btn-sm btn-outline-secondary">
+                                    <i class="bi bi-pencil-square"></i>
+                                </a>
                             </td>
                         </tr>
                     }

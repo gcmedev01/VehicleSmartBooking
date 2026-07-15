@@ -49,6 +49,12 @@ namespace VehicleSmartBooking.Controllers
             var driver = await _currentUser.GetCurrentDriverAsync(User);
             if (driver is null) return Forbid(); // user นี้ไม่ใช่ driver
 
+            var allowedStatuses = new[]
+            {
+                BookingStatus.WaitingDriverAccept,
+                BookingStatus.DriverAccepted
+            };
+
             // งานที่ assign ให้ driver นี้
             var jobs = await _db.Bookings
                 .AsNoTracking()
@@ -56,8 +62,8 @@ namespace VehicleSmartBooking.Controllers
                 .Include(b => b.AssignedVehicle)
                 .Include(b => b.AssignedDriver)
                     .ThenInclude(d => d.User)
-                .Where(b => b.AssignedDriverId == driver.DriverId)
-                .OrderByDescending(b => b.StartAtUtc)
+                .Where(b => b.AssignedDriverId == driver.DriverId && allowedStatuses.Contains(b.Status))
+                .OrderBy(b => b.StartAtUtc)
                 .ToListAsync();
 
             return View(jobs);

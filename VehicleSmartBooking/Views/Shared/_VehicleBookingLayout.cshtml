@@ -66,6 +66,17 @@
                    ?? User.FindFirst(ClaimTypes.NameIdentifier)?.Value
                    ?? "";
 
+    // =========================================================
+    // Central support team contacts
+    // TODO: แก้เป็นข้อมูลจริงของทีม support (ชื่อ / เบอร์ / อีเมล)
+    // =========================================================
+    var supportContacts = new[]
+    {
+        new { Name = "คุณ ศุธาสิณี มณีวรรณ", Phone = "78842", Email = "zSuthasinee.M@pttgcgroup.com" },
+        new { Name = "คุณพรทิพย์ ลิ้มถาวร", Phone = "78843", Email = "Porntip.L@pttgcgroup.com" },
+        new { Name = "คุณอรนุช สุขมั่น", Phone = "78841", Email = "ORANUT.S@pttgcgroup.com" },
+    };
+
     // Build initials: ignore common prefixes like "Mr."
     string GetInitials(string full)
     {
@@ -127,6 +138,22 @@
     <link rel="stylesheet" href="~/css/vehicle-booking.css" asp-append-version="true" />
     <link rel="manifest" href="/manifest.json" />
     <meta name="theme-color" content="#0d6efd" />
+    <!-- iOS Add-to-Home-Screen / standalone PWA hints (required for Web Push on iPhone) -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="Vehicle Booking" />
+    <link rel="apple-touch-icon" href="/img/van.png" />
+    <script>
+        // Restore desktop sidebar collapsed state before first paint (avoids flicker)
+        (function () {
+            try {
+                if (localStorage.getItem('vbSidebarCollapsed') === '1') {
+                    document.documentElement.classList.add('vb-sidebar-collapsed');
+                }
+            } catch (e) { }
+        })();
+    </script>
 
     @RenderSection("Styles", required: false)
 </head>
@@ -159,6 +186,10 @@
                             <div class="text-muted small">ระบบจองรถ</div>
                         </div>
                     </div>
+                    <button type="button" class="btn btn-sm btn-light vb-sidebar-collapse-btn ms-auto"
+                            id="vbSidebarCollapseBtn" title="ย่อเมนู" aria-label="ย่อเมนู" aria-expanded="true">
+                        <i class="bi bi-chevron-double-left"></i>
+                    </button>
                     <button type="button" class="btn-close d-md-none" data-bs-dismiss="offcanvas" aria-label="Close"></button>
                  </div>
 
@@ -173,7 +204,7 @@
                                class="vb-nav-item @(active == "MyRequest" ? "is-active" : "")"
                                aria-current="@(active == "MyRequest" ? "page" : "")">
                                 <span class="vb-nav-icon"><i class="bi bi-plus-circle"></i></span>
-                                My Request
+                                New Request
                             </a>
 
                             <a asp-controller="Booking" asp-action="MyBookings"
@@ -224,6 +255,9 @@
                                aria-current="@(active == "AdminWorklist" ? "page" : "")">
                                 <span class="vb-nav-icon"><i class="bi bi-list-check"></i></span>
                                 Admin Worklist
+                                <span class="ms-auto badge rounded-pill bg-danger d-none"
+                                      data-worklist-badge
+                                      style="font-size:.7rem;padding:3px 6px;line-height:1;"></span>
                             </a>
 
                             <a asp-controller="Admin" asp-action="AllBookings"
@@ -295,6 +329,33 @@
                             </a>
                         </div>
                     }
+
+                    @* ========= Support / contact ========= *@
+                    @if (User.Identity?.IsAuthenticated == true)
+                    {
+                        <div class="vb-nav-section">
+                            <div class="vb-nav-label">Cantact</div>
+                            <div class="vb-nav-help px-2 py-2 small text-muted">
+                                <div class="mb-2">หากมีข้อสงสัยหรือพบปัญหา ติดต่อ:</div>
+                                @foreach (var c in supportContacts)
+                                {
+                                    <div class="mb-2">
+                                        <div class="fw-semibold text-dark">
+                                            <i class="bi bi-person-circle me-1"></i>@c.Name
+                                        </div>
+                                        <div>
+                                            <i class="bi bi-telephone me-1"></i>
+                                            @c.Phone
+                                        </div>
+                                        <div class="text-break">
+                                            <i class="bi bi-envelope me-1"></i>
+                                            @c.Email
+                                        </div>
+                                    </div>
+                                }
+                            </div>
+                        </div>
+                    }
                 </nav>
 
                 <div class="vb-sidebar-footer">
@@ -349,6 +410,12 @@
              </div>
          </aside>
 
+        <!-- Reopen button (desktop, visible only when sidebar is collapsed) -->
+        <button type="button" class="btn btn-primary vb-sidebar-reopen-btn"
+                id="vbSidebarReopenBtn" title="เปิดเมนู" aria-label="เปิดเมนู">
+            <i class="bi bi-list"></i>
+        </button>
+
         <!-- Main -->
         <main class="vb-main">
             <div class="vb-main-inner">
@@ -362,6 +429,29 @@
     <script src="~/lib/jquery/dist/jquery.min.js"></script>
     <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <script>
+    // Desktop sidebar collapse/expand toggle (persisted in localStorage)
+    (function () {
+        var KEY = 'vbSidebarCollapsed';
+        var root = document.documentElement;
+        var collapseBtn = document.getElementById('vbSidebarCollapseBtn');
+        var reopenBtn = document.getElementById('vbSidebarReopenBtn');
+
+        function setCollapsed(collapsed) {
+            root.classList.toggle('vb-sidebar-collapsed', collapsed);
+            try { localStorage.setItem(KEY, collapsed ? '1' : '0'); } catch (e) { }
+            if (collapseBtn) collapseBtn.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+        }
+
+        if (collapseBtn) collapseBtn.addEventListener('click', function () { setCollapsed(true); });
+        if (reopenBtn) reopenBtn.addEventListener('click', function () { setCollapsed(false); });
+
+        // Reflect the state restored by the head script on the toggle button
+        if (collapseBtn && root.classList.contains('vb-sidebar-collapsed')) {
+            collapseBtn.setAttribute('aria-expanded', 'false');
+        }
+    })();
+    </script>
     <script>
     // Register service worker for PWA Web Push (HTTPS / localhost only)
     if ('serviceWorker' in navigator
@@ -400,6 +490,25 @@
             // Fetch count on initial page load
             window.refreshNotifBadges();
 
+            // ── Admin Worklist badge ──────────────────────────────────────
+            // Only present in the DOM for admins, so this is a no-op for other roles.
+            var worklistBadge = document.querySelector('[data-worklist-badge]');
+            if (worklistBadge) {
+                fetch('/Admin/WorklistCount', { credentials: 'same-origin' })
+                    .then(function (r) { return r.ok ? r.json() : null; })
+                    .then(function (d) {
+                        if (!d) return;
+                        var text = d.count > 99 ? '99+' : String(d.count);
+                        if (d.count > 0) {
+                            worklistBadge.textContent = text;
+                            worklistBadge.classList.remove('d-none');
+                        } else {
+                            worklistBadge.classList.add('d-none');
+                        }
+                    })
+                    .catch(function (e) { console.warn('[Worklist] Failed to fetch count', e); });
+            }
+
             // ── Bell dropdown ─────────────────────────────────────────────
             var bell = document.getElementById('notifBellBtn');
             if (!bell) return;
@@ -429,7 +538,7 @@
                                 try { dt = new Date(n.createdAtUtc).toLocaleString('th-TH', { dateStyle: 'short', timeStyle: 'short' }); }
                                 catch (e) { dt = ''; }
                             }
-                            return '<a href="/Notifications/MarkReadAndRedirect/' + n.notificationId + '"'
+                            return '<a href="' + (window.appBasePath || "/") + 'Notifications/MarkReadAndRedirect/' + n.notificationId + '"'
                                 + ' class="d-block text-decoration-none text-dark border-bottom px-3 py-2 ' + bg + '">'
                                 + '<div class="small ' + fw + '">' + esc(n.title) + '</div>'
                                 + '<div class="text-muted" style="font-size:.8rem;white-space:normal;">' + esc(n.message) + '</div>'

@@ -285,7 +285,7 @@
                         @foreach (var attachment in Model.Attachments.OrderByDescending(x => x.UploadedAtUtc))
                         {
                             <tr>
-                                <td><a href="@attachment.StoragePath" target="_blank">@attachment.FileName</a></td>
+                                <td><a href="@(Url.Content("~" + attachment.StoragePath))" target="_blank">@attachment.FileName</a></td>
                                 <td>@attachment.ContentType</td>
                                 <td class="text-end">@attachment.UploadedAtUtc.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</td>
                             </tr>

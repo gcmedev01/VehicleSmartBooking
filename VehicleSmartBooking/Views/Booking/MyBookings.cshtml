@@ -8,17 +8,7 @@
     ViewData["ActiveNav"] = "MyTask";
 
     // ---------- UI helpers ----------
-    string StatusClass(BookingStatus st) => st switch
-    {
-        BookingStatus.ApprovedSelfDrive => "vb-status-approved",
-        BookingStatus.Completed => "vb-status-completed",
-        BookingStatus.Rated => "vb-status-completed",
-
-        BookingStatus.Rejected => "vb-status-rejected",
-        BookingStatus.Cancelled => "vb-status-rejected",
-        BookingStatus.VendorRejectedByUser => "vb-status-rejected",
-        _ => "vb-status-pending"
-    };
+    string StatusClass(BookingStatus st) => VehicleBooking.Web.Domain.Helpers.BookingStatusHelper.StatusCssClass(st);
 
     string StatusText(BookingStatus st) => st switch
     {

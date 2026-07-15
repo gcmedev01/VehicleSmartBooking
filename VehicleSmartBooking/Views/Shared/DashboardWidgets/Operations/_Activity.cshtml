@@ -63,7 +63,7 @@
                         {
                             <tr>
                                 <td>
-                                    <a class="link-secondary" href="/AdminDashboard/Booking/@risk.BookingId?returnUrl=@Uri.EscapeDataString(returnUrl)">#@risk.BookingId</a>
+                                    <a class="link-secondary" href="@(Url.Content("~/AdminDashboard/Booking/" + risk.BookingId))?returnUrl=@Uri.EscapeDataString(returnUrl)">#@risk.BookingId</a>
                                 </td>
                                 <td>@risk.RequesterName</td>
                                 <td>@risk.Status</td>

@@ -103,6 +103,27 @@
     var unsubscribeBtn = document.getElementById('unsubscribeBtn');
     var testBtn     = document.getElementById('testBtn');
 
+    var isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+    var isStandalone = (window.navigator.standalone === true)
+        || (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches);
+
+    // Fetch that guarantees a JSON body. Detects auth redirects / HTML error pages so callers
+    // never JSON.parse an HTML login page (which would throw "Unexpected token '<'").
+    async function fetchJson(url, options) {
+        var resp = await fetch(url, options);
+        if (resp.status === 401 || resp.status === 403) {
+            throw new Error('เซสชันหมดอายุ กรุณาเข้าสู่ระบบใหม่แล้วลองอีกครั้ง');
+        }
+        if (resp.redirected || !resp.ok) {
+            throw new Error('ติดต่อเซิร์ฟเวอร์ไม่สำเร็จ (HTTP ' + resp.status + ') กรุณาเข้าสู่ระบบใหม่แล้วลองอีกครั้ง');
+        }
+        var ct = resp.headers.get('content-type') || '';
+        if (ct.indexOf('application/json') === -1) {
+            throw new Error('เซสชันหมดอายุหรือระบบตอบกลับไม่ถูกต้อง กรุณาเข้าสู่ระบบใหม่');
+        }
+        return resp.json();
+    }
+
     if (!supportsNotif) {
         showStatus('warning', 'เบราว์เซอร์นี้ไม่รองรับการแจ้งเตือนบนมือถือ');
         if (subscribeBtn) subscribeBtn.disabled = true;
@@ -139,6 +160,8 @@
 
         if (Notification.permission === 'granted') {
             showStatus('info', 'เปิดสิทธิ์แจ้งเตือนแล้ว กดปุ่มเพื่อสมัครรับแจ้งเตือน');
+        } else if (isIOS && !isStandalone) {
+            showStatus('info', 'บน iPhone: กด Share แล้วเลือก Add to Home Screen จากนั้นเปิดระบบจากไอคอนบนหน้าจอ จึงจะเปิดการแจ้งเตือนได้');
         } else {
             showStatus('info', 'กดปุ่มด้านล่างเพื่อเปิดการแจ้งเตือนบนมือถือ');
         }
@@ -208,11 +231,10 @@
             testBtn.disabled = true;
             testBtn.textContent = 'กำลังส่ง...';
             try {
-                var resp = await fetch('/PushNotifications/Test', {
+                var data = await fetchJson('/PushNotifications/Test', {
                     method: 'POST',
                     credentials: 'same-origin'
                 });
-                var data = await resp.json();
                 if (data.success) {
                     showStatus('success', data.message || 'ส่งการทดสอบแจ้งเตือนแล้ว กรุณาตรวจสอบโทรศัพท์');
                     if (window.refreshNotifBadges) window.refreshNotifBadges();
@@ -228,6 +250,16 @@
     }
 
     async function doSubscribe() {
+        // iOS only allows Web Push from an installed Home-Screen app (standalone). Calling
+        // subscribe() from a normal Safari tab throws a cryptic "The string did not match the
+        // expected pattern" — guide the user instead of surfacing that error.
+        if (isIOS && !isStandalone) {
+            showStatus('warning', 'บน iPhone ต้องเพิ่มเว็บลงหน้าจอโฮมก่อน: กด Share → Add to Home Screen แล้วเปิดระบบจากไอคอนบนหน้าจอ จึงจะเปิดการแจ้งเตือนได้');
+            subscribeBtn.disabled = false;
+            subscribeBtn.innerHTML = '<i class="bi bi-bell me-1"></i>เปิดการแจ้งเตือนบนมือถือ';
+            return;
+        }
+
         var perm = Notification.permission === 'granted'
             ? 'granted'
             : await Notification.requestPermission();
@@ -240,8 +272,7 @@
         }
 
         // Get VAPID public key
-        var keyResp = await fetch('/PushNotifications/PublicKey', { credentials: 'same-origin' });
-        var keyData = await keyResp.json();
+        var keyData = await fetchJson('/PushNotifications/PublicKey', { credentials: 'same-origin' });
         if (!keyData.enabled || !keyData.publicKey) {
             showStatus('warning', 'Web Push ยังไม่ได้ตั้งค่า VAPID กรุณาติดต่อผู้ดูแลระบบ');
             subscribeBtn.disabled = false;
@@ -260,7 +291,7 @@
         });
 
         var subJson = subscription.toJSON();
-        var resp = await fetch('/PushNotifications/Subscribe', {
+        var result = await fetchJson('/PushNotifications/Subscribe', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             credentials: 'same-origin',
@@ -271,7 +302,6 @@
                 userAgent: navigator.userAgent
             })
         });
-        var result = await resp.json();
         if (result.success) {
             setSubscribedUI();
         } else {

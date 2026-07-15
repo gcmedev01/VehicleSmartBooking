@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.EntityFrameworkCore;
 using System.ComponentModel.DataAnnotations;
+using System.Globalization;
 using System.Net.Http;
 using System.Security.Claims;
 using System.Text.Json;
@@ -61,10 +62,50 @@ namespace VehicleSmartBooking.Controllers
             return View(items);
         }
 
+        // GET: /Admin/WorklistCount (JSON count for the sidebar nav badge)
+        [HttpGet]
+        public async Task<IActionResult> WorklistCount()
+        {
+            var statuses = new[] { BookingStatus.WaitingAdminVendorQuotation, BookingStatus.WaitingAdminVendorConfirm, BookingStatus.WaitingAdminPersonal, BookingStatus.AdminActionRequired };
+
+            var count = await _db.Bookings
+                .AsNoTracking()
+                .CountAsync(b => statuses.Contains(b.Status));
+
+            return Json(new { count });
+        }
+
         [Authorize]
-        public async Task<IActionResult> AllBookings(DateTime? startDate, DateTime? endDate, string? functionAbbr, string? deptAbbr, string? divAbbr)
+        public async Task<IActionResult> AllBookings(
+            string? search,
+            BookingStatus? status,
+            TripType? tripType,
+            string? serviceType,
+            DateTime? startDate,
+            DateTime? endDate,
+            string? functionAbbr,
+            string? deptAbbr,
+            string? divAbbr,
+            int page = 1,
+            int pageSize = 20)
         {
             ViewData["ActiveNav"] = "AllTasks";
+
+            if (!Request.Query.ContainsKey("startDate"))
+            {
+                startDate = DateTime.Today;
+            }
+
+            page = page < 1 ? 1 : page;
+            pageSize = pageSize is < 1 or > 200 ? 20 : pageSize;
+
+            var trimmedSearch = string.IsNullOrWhiteSpace(search) ? null : search.Trim();
+            var trimmedServiceType = string.IsNullOrWhiteSpace(serviceType) ? null : serviceType.Trim().ToLowerInvariant();
+
+            ViewBag.Search = trimmedSearch;
+            ViewBag.Status = status;
+            ViewBag.TripType = tripType;
+            ViewBag.ServiceType = trimmedServiceType;
             ViewBag.StartDate = startDate?.ToString("yyyy-MM-dd");
             ViewBag.EndDate = endDate?.ToString("yyyy-MM-dd");
             ViewBag.FunctionAbbr = functionAbbr?.Trim();
@@ -73,107 +114,138 @@ namespace VehicleSmartBooking.Controllers
 
             await PopulateBookingFilterOptionsAsync();
 
+            void SetPagingViewBag(int currentPage, int totalCount, int totalPages)
+            {
+                ViewBag.Page = currentPage;
+                ViewBag.PageSize = pageSize;
+                ViewBag.TotalCount = totalCount;
+                ViewBag.TotalPages = totalPages;
+            }
+
             if (startDate.HasValue && endDate.HasValue && endDate.Value.Date < startDate.Value.Date)
             {
                 TempData["Error"] = "วันที่สิ้นสุดต้องมากกว่าหรือเท่ากับวันที่เริ่มต้น";
-                return View(new List<Booking>());
+                SetPagingViewBag(1, 0, 0);
+                return View(new List<AllBookingsRowVm>());
             }
 
             var userCodeClaim = User?.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             if (string.IsNullOrWhiteSpace(userCodeClaim))
             {
-                return View(new List<Booking>());
+                SetPagingViewBag(1, 0, 0);
+                return View(new List<AllBookingsRowVm>());
             }
 
-            var query = _db.Bookings
-                .AsNoTracking()
-                .Include(b => b.Requester)
-                .AsQueryable();
+            var query = BuildBookingsFilterQuery(
+                trimmedSearch, status, tripType, trimmedServiceType,
+                functionAbbr, deptAbbr, divAbbr, startDate, endDate);
 
-            if (!string.IsNullOrWhiteSpace(functionAbbr))
-            {
-                var term = functionAbbr.Trim();
-                query = query.Where(b => b.Requester.FunctionAbbr == term);
-            }
+            var totalCount = await query.CountAsync();
+            var totalPages = (int)Math.Ceiling(totalCount / (double)pageSize);
+            if (totalPages > 0 && page > totalPages) page = totalPages;
 
-            if (!string.IsNullOrWhiteSpace(deptAbbr))
-            {
-                var term = deptAbbr.Trim();
-                query = query.Where(b => b.Requester.DeptAbbr == term);
-            }
-
-            if (!string.IsNullOrWhiteSpace(divAbbr))
-            {
-                var term = divAbbr.Trim();
-                query = query.Where(b => b.Requester.DivAbbr == term);
-            }
-
-            var (startUtc, endExclusiveUtc) = BuildUtcDateRange(startDate, endDate);
-            if (startUtc.HasValue)
-            {
-                query = query.Where(b => b.StartAtUtc >= startUtc.Value);
-            }
-
-            if (endExclusiveUtc.HasValue)
-            {
-                query = query.Where(b => b.StartAtUtc < endExclusiveUtc.Value);
-            }
-
-            var bookings = await query
-                .OrderByDescending(b => b.StartAtUtc)
+            var rawRows = await query
+                .OrderBy(b => b.StartAtUtc)
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .Select(b => new
+                {
+                    b.BookingId,
+                    b.JobNo,
+                    b.TripType,
+                    b.VehicleTypeRequested,
+                    b.Status,
+                    b.IsPersonal,
+                    b.IsExternalRental,
+                    b.PickupLocation,
+                    b.DestinationLocation,
+                    b.StartAtUtc,
+                    b.EndAtUtc,
+                    RequesterName = b.Requester.UsernameTH,
+                    InternalPlateNo = b.AssignedVehicle != null ? b.AssignedVehicle.PlateNo : null,
+                    RentalPlateNo = b.ExternalRental != null ? b.ExternalRental.RentalPlateNo : null,
+                    VendorName = b.ExternalRental != null ? b.ExternalRental.VendorName : null
+                })
                 .ToListAsync();
+
+            var bookings = rawRows.Select(b => new AllBookingsRowVm
+            {
+                BookingId = b.BookingId,
+                JobNo = b.JobNo,
+                TripType = b.TripType,
+                VehicleTypeRequested = b.VehicleTypeRequested,
+                Status = b.Status,
+                RequesterName = b.RequesterName,
+                PlateNo = b.IsExternalRental ? b.RentalPlateNo : b.InternalPlateNo,
+                ServiceTypeText = GetServiceTypeText(b.IsPersonal, b.IsExternalRental),
+                ServiceTypePlateNo = (b.IsExternalRental && !string.IsNullOrWhiteSpace(b.RentalPlateNo)) ? b.RentalPlateNo : null,
+                PickupDisplay = Truncate(b.PickupLocation, 50),
+                DestinationDisplay = Truncate(b.DestinationLocation, 50),
+                StartDisplay = b.StartAtUtc.ToLocalTime().ToString("dd MMM yyyy HH:mm", CultureInfo.InvariantCulture),
+                EndDisplay = b.EndAtUtc.ToLocalTime().ToString("dd MMM yyyy HH:mm", CultureInfo.InvariantCulture),
+                VendorName = (b.IsExternalRental && !string.IsNullOrWhiteSpace(b.VendorName)) ? Truncate(b.VendorName, 50) : null,
+            }).ToList();
+
+            SetPagingViewBag(page, totalCount, totalPages);
 
             return View(bookings);
         }
 
+        public sealed class AllBookingsRowVm
+        {
+            public long BookingId { get; set; }
+            public string? JobNo { get; set; }
+            public TripType TripType { get; set; }
+            public VehicleType VehicleTypeRequested { get; set; }
+            public BookingStatus Status { get; set; }
+            public string? RequesterName { get; set; }
+
+            // Plate shown under "ประเภทรถ" — internal vehicle plate for company cars, otherwise the
+            // external rental's plate (once one has been recorded).
+            public string? PlateNo { get; set; }
+
+            public string ServiceTypeText { get; set; } = "";
+            // Populated only for external-rental rows that already have a rental plate on file.
+            public string? ServiceTypePlateNo { get; set; }
+
+            public string PickupDisplay { get; set; } = "";
+            public string DestinationDisplay { get; set; } = "";
+
+            public string StartDisplay { get; set; } = "";
+            public string EndDisplay { get; set; } = "";
+            public string? VendorName { get; set; } = "";
+        }
+
         [HttpGet]
-        public async Task<IActionResult> ExportBookingsExcel(DateTime? startDate, DateTime? endDate, string? functionAbbr, string? deptAbbr, string? divAbbr)
+        public async Task<IActionResult> ExportBookingsExcel(
+            string? search,
+            BookingStatus? status,
+            TripType? tripType,
+            string? serviceType,
+            DateTime? startDate,
+            DateTime? endDate,
+            string? functionAbbr,
+            string? deptAbbr,
+            string? divAbbr)
         {
             ViewData["ActiveNav"] = "AllTasks";
 
             if (startDate.HasValue && endDate.HasValue && endDate.Value.Date < startDate.Value.Date)
             {
                 TempData["Error"] = "วันที่สิ้นสุดต้องมากกว่าหรือเท่ากับวันที่เริ่มต้น";
-                return RedirectToAction(nameof(AllBookings), new { startDate, endDate, functionAbbr, deptAbbr, divAbbr });
+                return RedirectToAction(nameof(AllBookings), new { search, status, tripType, serviceType, startDate, endDate, functionAbbr, deptAbbr, divAbbr });
             }
 
-            var query = _db.Bookings
-                .AsNoTracking()
-                .Include(b => b.Requester)
+            var trimmedSearch = string.IsNullOrWhiteSpace(search) ? null : search.Trim();
+            var trimmedServiceType = string.IsNullOrWhiteSpace(serviceType) ? null : serviceType.Trim().ToLowerInvariant();
+
+            var query = BuildBookingsFilterQuery(
+                    trimmedSearch, status, tripType, trimmedServiceType,
+                    functionAbbr, deptAbbr, divAbbr, startDate, endDate)
                 .Include(b => b.AssignedVehicle)
                 .Include(b => b.AssignedDriver)
                     .ThenInclude(d => d.User)
-                .Include(b => b.ExternalRental)
-                .AsQueryable();
-
-            if (!string.IsNullOrWhiteSpace(functionAbbr))
-            {
-                var term = functionAbbr.Trim();
-                query = query.Where(b => b.Requester.FunctionAbbr == term);
-            }
-
-            if (!string.IsNullOrWhiteSpace(deptAbbr))
-            {
-                var term = deptAbbr.Trim();
-                query = query.Where(b => b.Requester.DeptAbbr == term);
-            }
-
-            if (!string.IsNullOrWhiteSpace(divAbbr))
-            {
-                var term = divAbbr.Trim();
-                query = query.Where(b => b.Requester.DivAbbr == term);
-            }
-
-            var (startUtc, endExclusiveUtc) = BuildUtcDateRange(startDate, endDate);
-            if (startUtc.HasValue)
-            {
-                query = query.Where(b => b.StartAtUtc >= startUtc.Value);
-            }
-
-            if (endExclusiveUtc.HasValue)
-            {
-                query = query.Where(b => b.StartAtUtc < endExclusiveUtc.Value);
-            }
+                .Include(b => b.ExternalRental);
 
             var bookings = await query
                 .OrderByDescending(b => b.StartAtUtc)
@@ -228,7 +300,7 @@ namespace VehicleSmartBooking.Controllers
                 worksheet.Cell(row, 5).Value = booking.Requester?.UserCode ?? string.Empty;
                 worksheet.Cell(row, 6).Value = GetTripTypeText(booking.TripType);
                 worksheet.Cell(row, 7).Value = GetVehicleTypeText(booking.VehicleTypeRequested);
-                worksheet.Cell(row, 8).Value = GetServiceTypeText(booking);
+                worksheet.Cell(row, 8).Value = GetServiceTypeText(booking.IsPersonal, booking.IsExternalRental);
                 worksheet.Cell(row, 9).Value = GetBookingStatusText(booking.Status);
                 worksheet.Cell(row, 10).Value = booking.PickupLocation;
                 worksheet.Cell(row, 11).Value = booking.DestinationLocation;
@@ -297,81 +369,65 @@ namespace VehicleSmartBooking.Controllers
                 return RedirectToAction(nameof(Detail), new { id });
             }
 
-            // basic validation
-            if (string.IsNullOrWhiteSpace(model.VendorName) && model.QuotedPrice == null)
+            // Server-side validation (never rely on client-side only): vendor name is required and
+            // the quoted price must be a number greater than 0. Reject without saving otherwise.
+            var vendorName = model.VendorName?.Trim();
+            if (string.IsNullOrWhiteSpace(vendorName))
             {
-                TempData["Error"] = "Vendor name or quoted price is required.";
+                TempData["Error"] = "กรุณาเลือกผู้ให้บริการ";
+                return RedirectToAction(nameof(Detail), new { id });
+            }
+            if (model.QuotedPrice is null)
+            {
+                TempData["Error"] = "กรุณากรอกราคา";
+                return RedirectToAction(nameof(Detail), new { id });
+            }
+            if (model.QuotedPrice <= 0)
+            {
+                TempData["Error"] = "ราคาต้องมากกว่า 0";
                 return RedirectToAction(nameof(Detail), new { id });
             }
 
-            // upsert ExternalRental
+            model.VendorName = vendorName;
             var now = DateTime.UtcNow;
-            var isSpecialOccasion = booking.SpecialOccasionType.HasValue;
+
+            booking.ExternalRental = new ExternalRental
+            {
+                BookingId = booking.BookingId,
+                VendorName = model.VendorName,
+                QuotedPrice = model.QuotedPrice,
+                QuoteSentAtUtc = now,
+                UserDecision = ExternalUserDecision.Pending
+            };
+            _db.ExternalRentals.Add(booking.ExternalRental);
+
+            booking.IsExternalRental = true;
+            booking.Status = BookingStatus.WaitingUserVendorAccept;
+            booking.UpdatedAtUtc = now;
+
+            await _db.SaveChangesAsync();
+
             try
             {
-                if (booking.ExternalRental == null)
-                {
-                    booking.ExternalRental = new ExternalRental
-                    {
-                        BookingId = booking.BookingId,
-                        VendorName = model.VendorName,
-                        QuotedPrice = model.QuotedPrice,
-                        QuoteSentAtUtc = now,
-                        UserDecision = isSpecialOccasion ? ExternalUserDecision.Accepted : ExternalUserDecision.Pending,
-                        UserDecisionAtUtc = isSpecialOccasion ? now : null,
-                        Note = model.Note,
-                        AdminClosedAtUtc = isSpecialOccasion ? now : null
-                    };
-                    _db.ExternalRentals.Add(booking.ExternalRental);
-                }
-                else
-                {
-                    booking.ExternalRental.VendorName = model.VendorName;
-                    booking.ExternalRental.QuotedPrice = model.QuotedPrice;
-                    booking.ExternalRental.QuoteSentAtUtc = now;
-                    booking.ExternalRental.UserDecision = isSpecialOccasion ? ExternalUserDecision.Accepted : ExternalUserDecision.Pending;
-                    booking.ExternalRental.UserDecisionAtUtc = isSpecialOccasion ? now : null;
-                    booking.ExternalRental.Note = model.Note;
-                    booking.ExternalRental.AdminClosedAtUtc = isSpecialOccasion ? now : null;
-                }
-
-                booking.IsExternalRental = true;
-                booking.Status = isSpecialOccasion
-                    ? BookingStatus.Completed
-                    : BookingStatus.WaitingUserVendorAccept;
-                booking.UpdatedAtUtc = now;
-
-                await _db.SaveChangesAsync();
-
                 if (!string.IsNullOrWhiteSpace(booking.Requester?.Email))
                 {
-                    if (isSpecialOccasion)
-                    {
-                        await _emailNotifications.NotifyStatusChangedAsync(
-                            booking,
-                            Array.Empty<string>(),
-                            booking.Requester.Email,
-                            statusChangedAtUtc: booking.UpdatedAtUtc,
-                            relativeUrl: $"/Booking/Detail/{booking.BookingId}");
-                    }
-                    else
-                    {
-                        await _emailNotifications.NotifyActionRequiredAsync(
+                    await _emailNotifications.NotifyActionRequiredAsync(
                             booking,
                             new[] { booking.Requester.Email },
                             "กรุณายอมรับหรือปฏิเสธผู้ให้บริการ",
                             relativeUrl: $"/Booking/Detail/{booking.BookingId}");
-                    }
-                }
 
-                TempData["Success"] = isSpecialOccasion
-                    ? "บันทึกราคารถภายนอกเรียบร้อย และปิดงานแล้ว"
-                    : "Vendor quote sent.";
+                    TempData["Success"] = "บันทึกราคารถภายนอกเรียบร้อย";
+                }
+                else
+                {
+                    TempData["Error"] = "Failed to send email. Requester email not found.";
+                }
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Failed to save vendor quote for booking {BookingId}", booking.BookingId);
-                TempData["Error"] = "Failed to save vendor quote. See logs.";
+                _logger.LogError(ex, "Failed to send email for booking VS-{BookingId}", booking.BookingId);
+                TempData["Error"] = "Failed to send email. See logs.";
             }
 
             return RedirectToAction(nameof(Detail), new { id });
@@ -392,15 +448,43 @@ namespace VehicleSmartBooking.Controllers
             var booking = await _db.Bookings.Include(b => b.ExternalRental).SingleOrDefaultAsync(b => b.BookingId == id);
             if (booking == null) return NotFound();
 
+            // Server-side validation (never rely on client-side only): plate, driver name and phone
+            // are all required. Trim before checking. Reject without creating/updating otherwise.
+            if (model == null)
+            {
+                TempData["Error"] = "ข้อมูลไม่ครบถ้วน";
+                return RedirectToAction(nameof(Detail), new { id });
+            }
+
+            var plateNo = model.RentalPlateNo?.Trim();
+            var driverName = model.RentalDriverName?.Trim();
+            var driverPhone = model.RentalDriverPhone?.Trim();
+
+            if (string.IsNullOrWhiteSpace(plateNo))
+            {
+                TempData["Error"] = "กรุณากรอกทะเบียนรถ";
+                return RedirectToAction(nameof(Detail), new { id });
+            }
+            if (string.IsNullOrWhiteSpace(driverName))
+            {
+                TempData["Error"] = "กรุณากรอกชื่อผู้ขับ";
+                return RedirectToAction(nameof(Detail), new { id });
+            }
+            if (string.IsNullOrWhiteSpace(driverPhone))
+            {
+                TempData["Error"] = "กรุณากรอกเบอร์โทรติดต่อ";
+                return RedirectToAction(nameof(Detail), new { id });
+            }
+
             if (booking.ExternalRental == null)
             {
                 booking.ExternalRental = new ExternalRental { BookingId = booking.BookingId };
                 _db.ExternalRentals.Add(booking.ExternalRental);
             }
 
-            booking.ExternalRental.RentalPlateNo = model.RentalPlateNo;
-            booking.ExternalRental.RentalDriverName = model.RentalDriverName;
-            booking.ExternalRental.RentalDriverPhone = model.RentalDriverPhone;
+            booking.ExternalRental.RentalPlateNo = plateNo;
+            booking.ExternalRental.RentalDriverName = driverName;
+            booking.ExternalRental.RentalDriverPhone = driverPhone;
             booking.ExternalRental.AdminClosedAtUtc = null; // reopen
 
             booking.IsExternalRental = true;
@@ -592,6 +676,318 @@ namespace VehicleSmartBooking.Controllers
                 .ToListAsync();
 
             return View(drivers);
+        }
+
+        // GET: /Admin/Drivers/Detail/{id}
+        [HttpGet("/Admin/Drivers/Detail/{id:int}")]
+        public async Task<IActionResult> DriverDetail(
+            int id,
+            string? search,
+            BookingStatus? status,
+            TripType? tripType,
+            string? serviceType,
+            DateTime? startDate,
+            DateTime? endDate,
+            int page = 1,
+            int pageSize = 20)
+        {
+            ViewData["ActiveNav"] = "AdminDrivers";
+
+            var driver = await _db.Drivers
+                .AsNoTracking()
+                .Include(d => d.User)
+                .Include(d => d.Vehicle)
+                .SingleOrDefaultAsync(d => d.DriverId == id);
+
+            if (driver is null) return NotFound();
+
+            page = page < 1 ? 1 : page;
+            pageSize = pageSize is < 1 or > 200 ? 20 : pageSize;
+
+            var trimmedSearch = string.IsNullOrWhiteSpace(search) ? null : search.Trim();
+            var trimmedServiceType = string.IsNullOrWhiteSpace(serviceType) ? null : serviceType.Trim().ToLowerInvariant();
+
+            var vm = new DriverDetailVm
+            {
+                DriverId = driver.DriverId,
+                DriverName = driver.User.UsernameTH ?? driver.User.UsernameEN ?? driver.User.UserCode,
+                DriverNameEn = driver.User.UsernameEN,
+                UserCode = driver.User.UserCode,
+                PhoneNo = driver.Phone,
+                IsActive = driver.IsActive,
+                CanDriveOutOfProvince = driver.CanDriveOutOfProvince,
+                VehicleType = driver.Vehicle != null ? GetVehicleTypeText(driver.Vehicle.VehicleType) : null,
+                PlateNo = driver.Vehicle?.PlateNo,
+                Search = trimmedSearch,
+                Status = status,
+                TripType = tripType,
+                ServiceType = trimmedServiceType,
+                StartDate = startDate,
+                EndDate = endDate,
+                PageSize = pageSize
+            };
+
+            await PopulateDriverRatingSummaryAsync(vm, id);
+
+            if (startDate.HasValue && endDate.HasValue && endDate.Value.Date < startDate.Value.Date)
+            {
+                TempData["Error"] = "วันที่สิ้นสุดต้องมากกว่าหรือเท่ากับวันที่เริ่มต้น";
+                vm.Page = 1;
+                vm.TotalCount = 0;
+                vm.TotalPages = 0;
+                return View(vm);
+            }
+
+            // Query pipeline (server-side, in order): scope to this driver -> apply search ->
+            // apply other filters -> count for paging -> order -> skip/take -> project.
+            var query = BuildDriverBookingsQuery(id, trimmedSearch, status, tripType, trimmedServiceType, startDate, endDate);
+
+            var totalCount = await query.CountAsync();
+            var totalPages = (int)Math.Ceiling(totalCount / (double)pageSize);
+            if (totalPages > 0 && page > totalPages) page = totalPages;
+
+            var rawRows = await query
+                .OrderByDescending(b => b.StartAtUtc)
+                .ThenByDescending(b => b.BookingId)
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .Select(b => new
+                {
+                    b.BookingId,
+                    b.JobNo,
+                    b.TripType,
+                    b.Status,
+                    b.IsPersonal,
+                    b.IsExternalRental,
+                    b.PickupLocation,
+                    b.DestinationLocation,
+                    b.StartAtUtc,
+                    b.EndAtUtc,
+                    RequesterName = b.Requester.UsernameTH,
+                    InternalPlateNo = b.AssignedVehicle != null ? b.AssignedVehicle.PlateNo : null,
+                    RentalPlateNo = b.ExternalRental != null ? b.ExternalRental.RentalPlateNo : null,
+                    RatingScore = b.Rating != null
+                        ? (double?)((b.Rating.Score1 + b.Rating.Score2 + b.Rating.Score3 + b.Rating.Score4 + b.Rating.Score5) / 5.0)
+                        : null
+                })
+                .ToListAsync();
+
+            // In-memory mapping stage: formatting/truncation is plain C#, not translatable to SQL,
+            // so it happens here — once, after materialization — rather than in the view.
+            vm.Bookings = rawRows.Select(b => new DriverBookingRowVm
+            {
+                BookingId = b.BookingId,
+                JobNo = b.JobNo,
+                RequesterName = b.RequesterName,
+                TripType = b.TripType,
+                ServiceTypeText = GetServiceTypeText(b.IsPersonal, b.IsExternalRental),
+                PlateNo = b.IsExternalRental ? b.RentalPlateNo : b.InternalPlateNo,
+                PickupDisplay = Truncate(b.PickupLocation, 50),
+                DestinationDisplay = Truncate(b.DestinationLocation, 50),
+                StartDisplay = b.StartAtUtc.ToLocalTime().ToString("dd MMM yyyy HH:mm", CultureInfo.InvariantCulture),
+                EndDisplay = b.EndAtUtc.ToLocalTime().ToString("dd MMM yyyy HH:mm", CultureInfo.InvariantCulture),
+                Status = b.Status,
+                RatingScore = b.RatingScore
+            }).ToList();
+
+            vm.Page = page;
+            vm.TotalCount = totalCount;
+            vm.TotalPages = totalPages;
+
+            return View(vm);
+        }
+
+        // Shared server-side filter builder for the driver-scoped booking list on Driver Detail.
+        // Query order: scope to driver -> search -> all other filters. A numeric/"VS-123" search
+        // takes an exact-match fast path on the indexed primary key instead of being OR'd together
+        // with the text Contains() clauses (which would force a full scan across many columns).
+        private IQueryable<Booking> BuildDriverBookingsQuery(
+            int driverId,
+            string? search,
+            BookingStatus? status,
+            TripType? tripType,
+            string? serviceType,
+            DateTime? startDate,
+            DateTime? endDate)
+        {
+            var query = _db.Bookings
+                .AsNoTracking()
+                .Where(b => b.AssignedDriverId == driverId);
+
+            if (!string.IsNullOrWhiteSpace(search))
+            {
+                var keyword = search.Trim();
+                var idKeyword = keyword.StartsWith("VS-", StringComparison.OrdinalIgnoreCase)
+                    ? keyword["VS-".Length..]
+                    : keyword;
+
+                if (long.TryParse(idKeyword, out var bookingId))
+                {
+                    query = query.Where(b => b.BookingId == bookingId);
+                }
+                else
+                {
+                    query = query.Where(b =>
+                        (b.JobNo != null && b.JobNo.Contains(keyword)) ||
+                        (b.Purpose != null && b.Purpose.Contains(keyword)) ||
+                        b.PickupLocation.Contains(keyword) ||
+                        b.DestinationLocation.Contains(keyword) ||
+                        (b.Requester.UsernameTH != null && b.Requester.UsernameTH.Contains(keyword)) ||
+                        (b.Requester.UsernameEN != null && b.Requester.UsernameEN.Contains(keyword)) ||
+                        b.Requester.UserCode.Contains(keyword) ||
+                        (b.AssignedVehicle != null && b.AssignedVehicle.PlateNo.Contains(keyword)) ||
+                        (b.ExternalRental != null && b.ExternalRental.RentalPlateNo != null && b.ExternalRental.RentalPlateNo.Contains(keyword)));
+                }
+            }
+
+            if (status.HasValue)
+            {
+                query = query.Where(b => b.Status == status.Value);
+            }
+
+            if (tripType.HasValue)
+            {
+                query = query.Where(b => b.TripType == tripType.Value);
+            }
+
+            if (serviceType == "personal")
+            {
+                query = query.Where(b => b.IsPersonal);
+            }
+            else if (serviceType == "external")
+            {
+                query = query.Where(b => !b.IsPersonal && b.IsExternalRental);
+            }
+            else if (serviceType == "company")
+            {
+                query = query.Where(b => !b.IsPersonal && !b.IsExternalRental);
+            }
+
+            var (startUtc, endExclusiveUtc) = BuildUtcDateRange(startDate, endDate);
+            if (startUtc.HasValue)
+            {
+                query = query.Where(b => b.StartAtUtc >= startUtc.Value);
+            }
+
+            if (endExclusiveUtc.HasValue)
+            {
+                query = query.Where(b => b.StartAtUtc < endExclusiveUtc.Value);
+            }
+
+            return query;
+        }
+
+        // Lifetime rating summary for the driver (independent of the booking list's search/filter/
+        // pagination) — average/highest/lowest score plus the 5 most recent rating comments.
+        private async Task PopulateDriverRatingSummaryAsync(DriverDetailVm vm, int driverId)
+        {
+            var ratingScoresQuery = _db.DriverRatings
+                .AsNoTracking()
+                .Where(r => r.DriverId == driverId)
+                .Select(r => (double)(r.Score1 + r.Score2 + r.Score3 + r.Score4 + r.Score5) / 5.0);
+
+            vm.RatingCount = await ratingScoresQuery.CountAsync();
+
+            if (vm.RatingCount > 0)
+            {
+                vm.AverageRating = await ratingScoresQuery.AverageAsync();
+                vm.HighestRating = await ratingScoresQuery.MaxAsync();
+                vm.LowestRating = await ratingScoresQuery.MinAsync();
+            }
+
+            vm.CompletedJobCount = await _db.Bookings.AsNoTracking().CountAsync(b =>
+                b.AssignedDriverId == driverId &&
+                (b.Status == BookingStatus.Completed || b.Status == BookingStatus.Rated));
+
+            var rawRatings = await _db.DriverRatings
+                .AsNoTracking()
+                .Where(r => r.DriverId == driverId)
+                .OrderByDescending(r => r.CreatedAtUtc)
+                .Take(5)
+                .Select(r => new
+                {
+                    r.BookingId,
+                    r.Booking.JobNo,
+                    EvaluatorName = r.Booking.Requester.UsernameTH,
+                    Score = (r.Score1 + r.Score2 + r.Score3 + r.Score4 + r.Score5) / 5.0,
+                    r.Comment,
+                    r.CreatedAtUtc
+                })
+                .ToListAsync();
+
+            vm.RecentRatings = rawRatings.Select(r => new DriverRatingRowVm
+            {
+                BookingId = r.BookingId,
+                JobNo = r.JobNo,
+                EvaluatorName = r.EvaluatorName,
+                Score = r.Score,
+                Comment = r.Comment,
+                RatedAtDisplay = r.CreatedAtUtc.ToLocalTime().ToString("dd MMM yyyy HH:mm", CultureInfo.InvariantCulture)
+            }).ToList();
+        }
+
+        // Read-only ViewModel for /Admin/Drivers/Detail/{id} — never send the Driver/Booking/
+        // DriverRating entity graph directly into the view.
+        public sealed class DriverDetailVm
+        {
+            public int DriverId { get; set; }
+
+            public string DriverName { get; set; } = string.Empty;
+            public string? DriverNameEn { get; set; }
+            public string? UserCode { get; set; }
+            public string? PhoneNo { get; set; }
+            public bool IsActive { get; set; }
+            public bool CanDriveOutOfProvince { get; set; }
+
+            public string? VehicleType { get; set; }
+            public string? PlateNo { get; set; }
+
+            public double? AverageRating { get; set; }
+            public int RatingCount { get; set; }
+            public double? HighestRating { get; set; }
+            public double? LowestRating { get; set; }
+            public int CompletedJobCount { get; set; }
+
+            public List<DriverBookingRowVm> Bookings { get; set; } = new();
+            public List<DriverRatingRowVm> RecentRatings { get; set; } = new();
+
+            public int Page { get; set; }
+            public int PageSize { get; set; }
+            public int TotalCount { get; set; }
+            public int TotalPages { get; set; }
+
+            public string? Search { get; set; }
+            public BookingStatus? Status { get; set; }
+            public TripType? TripType { get; set; }
+            public string? ServiceType { get; set; }
+            public DateTime? StartDate { get; set; }
+            public DateTime? EndDate { get; set; }
+        }
+
+        public sealed class DriverBookingRowVm
+        {
+            public long BookingId { get; set; }
+            public string? JobNo { get; set; }
+            public string? RequesterName { get; set; }
+            public TripType TripType { get; set; }
+            public string ServiceTypeText { get; set; } = "";
+            public string? PlateNo { get; set; }
+            public string PickupDisplay { get; set; } = "";
+            public string DestinationDisplay { get; set; } = "";
+            public string StartDisplay { get; set; } = "";
+            public string EndDisplay { get; set; } = "";
+            public BookingStatus Status { get; set; }
+            public double? RatingScore { get; set; }
+        }
+
+        public sealed class DriverRatingRowVm
+        {
+            public long BookingId { get; set; }
+            public string? JobNo { get; set; }
+            public string? EvaluatorName { get; set; }
+            public double Score { get; set; }
+            public string? Comment { get; set; }
+            public string RatedAtDisplay { get; set; } = "";
         }
 
         // GET: /Admin/drivers/edit/{id}
@@ -1832,15 +2228,25 @@ namespace VehicleSmartBooking.Controllers
         // ===== Models =====
         public class VendorQuoteModel
         {
+            [Required]
             public string? VendorName { get; set; }
+
+            [Required]
+            [Range(0.01, double.MaxValue)]
             public decimal? QuotedPrice { get; set; }
+
             public string? Note { get; set; }
         }
 
         public class VendorConfirmModel
         {
+            [Required]
             public string? RentalPlateNo { get; set; }
+
+            [Required]
             public string? RentalDriverName { get; set; }
+
+            [Required]
             public string? RentalDriverPhone { get; set; }
         }
 
@@ -1998,6 +2404,65 @@ namespace VehicleSmartBooking.Controllers
             return RedirectToAction(nameof(Detail), new { id });
         }
 
+        // POST: /Admin/RejectBooking/{id}
+        // Admin override: reject a booking in any non-terminal step (including steps where the
+        // admin is not the current actor). Reject in the admin's own step is handled elsewhere.
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> RejectBooking(long id)
+        {
+            var booking = await _db.Bookings
+                .Include(b => b.Requester)
+                .SingleOrDefaultAsync(b => b.BookingId == id);
+
+            if (booking == null) return NotFound();
+
+            if (BookingStatusHelper.TerminalStatuses.Contains(booking.Status))
+            {
+                TempData["Error"] = "ใบงานนี้อยู่ในสถานะสิ้นสุดแล้ว ไม่สามารถปฏิเสธได้";
+                return RedirectToAction(nameof(Detail), new { id });
+            }
+
+            var assignedDriverId = booking.AssignedDriverId;
+
+            booking.Status = BookingStatus.Rejected;
+            booking.UpdatedAtUtc = DateTime.UtcNow;
+
+            await _db.SaveChangesAsync();
+
+            if (!string.IsNullOrWhiteSpace(booking.Requester?.Email))
+            {
+                try
+                {
+                    await _emailNotifications.NotifyStatusChangedAsync(
+                        booking,
+                        Array.Empty<string>(),
+                        booking.Requester.Email,
+                        statusChangedAtUtc: booking.UpdatedAtUtc,
+                        relativeUrl: $"/Booking/Detail/{booking.BookingId}");
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Failed to send reject email for booking {BookingId}", booking.BookingId);
+                }
+            }
+
+            if (assignedDriverId.HasValue)
+            {
+                try
+                {
+                    await _driverBookingNotifications.NotifyBookingCancelledAsync(booking.BookingId, assignedDriverId.Value);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Failed to notify driver about rejected booking {BookingId}", booking.BookingId);
+                }
+            }
+
+            TempData["Success"] = "ปฏิเสธใบงานเรียบร้อยแล้ว";
+            return RedirectToAction(nameof(Detail), new { id });
+        }
+
         private async Task CreateApprovalsFromLineManagerChainAsync(long bookingId, int requesterUserId)
         {
             var now = DateTime.UtcNow;
@@ -2036,6 +2501,10 @@ namespace VehicleSmartBooking.Controllers
                     CreatedAtUtc = now
                 })
             );
+
+            // approver chain created -> booking now waits for approval decision
+            bookingForApproval.Status = BookingStatus.WaitingApproval;
+            bookingForApproval.UpdatedAtUtc = now;
 
             await _db.SaveChangesAsync();
         }
@@ -2135,6 +2604,126 @@ namespace VehicleSmartBooking.Controllers
                 .ToListAsync();
         }
 
+        // Shared server-side filter builder for /Admin/AllBookings and /Admin/ExportBookingsExcel.
+        // Query order: base table -> search -> all other filters. Callers apply OrderBy/Skip/Take
+        // (and any additional Include for their own projection) on the returned IQueryable.
+        private IQueryable<Booking> BuildBookingsFilterQuery(
+            string? search,
+            BookingStatus? status,
+            TripType? tripType,
+            string? serviceType,
+            string? functionAbbr,
+            string? deptAbbr,
+            string? divAbbr,
+            DateTime? startDate,
+            DateTime? endDate)
+        {
+            var query = _db.Bookings
+                .AsNoTracking()
+                .Include(b => b.Requester)
+                .AsQueryable();
+
+            if (!string.IsNullOrWhiteSpace(search))
+            {
+                var keyword = search.Trim();
+                var idKeyword = keyword.StartsWith("VS-", StringComparison.OrdinalIgnoreCase)
+                    ? keyword["VS-".Length..]
+                    : keyword;
+                var hasNumericId = long.TryParse(idKeyword, out var idValue);
+
+                query = query.Where(b =>
+                    (hasNumericId && b.BookingId == idValue) ||
+                    (b.JobNo != null && b.JobNo.Contains(keyword)) ||
+                    (b.Purpose != null && b.Purpose.Contains(keyword)) ||
+                    b.PickupLocation.Contains(keyword) ||
+                    b.DestinationLocation.Contains(keyword) ||
+                    (b.Requester.UsernameTH != null && b.Requester.UsernameTH.Contains(keyword)) ||
+                    (b.Requester.UsernameEN != null && b.Requester.UsernameEN.Contains(keyword)) ||
+                    b.Requester.UserCode.Contains(keyword) ||
+                    (b.AssignedVehicle != null && b.AssignedVehicle.PlateNo.Contains(keyword)) ||
+                    (b.AssignedDriver != null && b.AssignedDriver.User.UsernameTH != null && b.AssignedDriver.User.UsernameTH.Contains(keyword)) ||
+                    (b.AssignedDriver != null && b.AssignedDriver.User.UsernameEN != null && b.AssignedDriver.User.UsernameEN.Contains(keyword)) ||
+                    (b.ExternalRental != null && b.ExternalRental.RentalPlateNo != null && b.ExternalRental.RentalPlateNo.Contains(keyword)) ||
+                    (b.ExternalRental != null && b.ExternalRental.VendorName != null && b.ExternalRental.VendorName.Contains(keyword)));
+            }
+
+            if (status.HasValue)
+            {
+                query = query.Where(b => b.Status == status.Value);
+            }
+
+            if (tripType.HasValue)
+            {
+                query = query.Where(b => b.TripType == tripType.Value);
+            }
+
+            // serviceType mirrors the same "company / external / personal" grouping the page used
+            // to compute client-side from IsPersonal/IsExternalRental.
+            if (serviceType == "personal")
+            {
+                query = query.Where(b => b.IsPersonal);
+            }
+            else if (serviceType == "external")
+            {
+                query = query.Where(b => !b.IsPersonal && b.IsExternalRental);
+            }
+            else if (serviceType == "company")
+            {
+                query = query.Where(b => !b.IsPersonal && !b.IsExternalRental);
+            }
+
+            if (!string.IsNullOrWhiteSpace(functionAbbr))
+            {
+                var term = functionAbbr.Trim();
+                query = query.Where(b => b.Requester.FunctionAbbr == term);
+            }
+
+            if (!string.IsNullOrWhiteSpace(deptAbbr))
+            {
+                var term = deptAbbr.Trim();
+                query = query.Where(b => b.Requester.DeptAbbr == term);
+            }
+
+            if (!string.IsNullOrWhiteSpace(divAbbr))
+            {
+                var term = divAbbr.Trim();
+                query = query.Where(b => b.Requester.DivAbbr == term);
+            }
+
+            var (startUtc, endExclusiveUtc) = BuildUtcDateRange(startDate, endDate);
+            if (startUtc.HasValue)
+            {
+                query = query.Where(b => b.StartAtUtc >= startUtc.Value);
+            }
+
+            if (endExclusiveUtc.HasValue)
+            {
+                query = query.Where(b => b.StartAtUtc < endExclusiveUtc.Value);
+            }
+
+            return query;
+        }
+
+        // Aggregates status counts for the filtered result set (not just the current page) via a
+        // single GroupBy query, so the stat tiles reflect the same filter as the grid/pagination.
+        private static async Task<(int All, int Pending, int Completed, int Bad)> GetBookingStatusStatsAsync(IQueryable<Booking> filteredQuery)
+        {
+            var completedStatuses = new[] { BookingStatus.Completed, BookingStatus.Rated };
+            var badStatuses = new[] { BookingStatus.Rejected, BookingStatus.Cancelled };
+
+            var statusCounts = await filteredQuery
+                .GroupBy(b => b.Status)
+                .Select(g => new { Status = g.Key, Count = g.Count() })
+                .ToListAsync();
+
+            var all = statusCounts.Sum(x => x.Count);
+            var completed = statusCounts.Where(x => completedStatuses.Contains(x.Status)).Sum(x => x.Count);
+            var bad = statusCounts.Where(x => badStatuses.Contains(x.Status)).Sum(x => x.Count);
+            var pending = all - completed - bad;
+
+            return (all, pending, completed, bad);
+        }
+
         private static string BuildDateRangeFileSuffix(DateTime? startDate, DateTime? endDate)
         {
             if (startDate.HasValue && endDate.HasValue)
@@ -2171,19 +2760,35 @@ namespace VehicleSmartBooking.Controllers
             _ => vehicleType.ToString()
         };
 
-        private static string GetServiceTypeText(Booking booking)
+        private static string GetServiceTypeText(bool isPersonal, bool isExternalRental)
         {
-            if (booking.IsPersonal)
+            if (isPersonal)
             {
                 return "รถส่วนตัว";
             }
 
-            if (booking.IsExternalRental)
+            if (isExternalRental)
             {
                 return "รถภายนอกบริษัท";
             }
 
             return "รถในบริษัท";
+        }
+
+        // Truncates display text to maxLength characters, appending "..." when cut. Never renders
+        // "null"/empty text — falls back to "-" so table layout doesn't collapse.
+        private static string Truncate(string? value, int maxLength)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return "-";
+            }
+
+            value = value.Trim();
+
+            return value.Length <= maxLength
+                ? value
+                : value[..maxLength] + "...";
         }
 
         private static string GetBookingStatusText(BookingStatus status) => status switch

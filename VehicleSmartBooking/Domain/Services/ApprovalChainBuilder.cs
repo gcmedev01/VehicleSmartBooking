@@ -41,13 +41,34 @@ public sealed class ApprovalChainBuilder
 
         foreach (var role in requiredRoles)
         {
-            var approver = await FindNextApproverAsync(current, role, usedUserIds);
+            var effectiveRole = role;
+            var approver = await FindApproverByRoleAsync(current, role);
+
+            // Fallback: any scenario that requires a DM but whose requester has no Division Manager
+            // in the line-manager chain uses the VP instead (when a VP exists higher up).
+            if (approver is null && role == ApproverRole.DM)
+            {
+                var vpApprover = await FindApproverByRoleAsync(current, ApproverRole.VP);
+                if (vpApprover is not null)
+                {
+                    effectiveRole = ApproverRole.VP;
+                    approver = vpApprover;
+                }
+            }
+
             if (approver is null)
             {
                 continue;
             }
 
-            approvals.Add(new ApprovalCandidate(approver, approvals.Count + 1, role));
+            // Never add the same approver twice — e.g. a DM step fell back to VP and the scenario
+            // also contains a VP step that resolves to the same person (avoids VP, VP).
+            if (!usedUserIds.Add(approver.UserId))
+            {
+                continue;
+            }
+
+            approvals.Add(new ApprovalCandidate(approver, approvals.Count + 1, effectiveRole));
             current = approver;
         }
 
@@ -62,23 +83,29 @@ public sealed class ApprovalChainBuilder
         return result.Approvers;
     }
 
-    private async Task<User?> FindNextApproverAsync(User startFrom, ApproverRole targetRole, HashSet<int> usedUserIds)
+    // Walks up the requester's line-manager chain and returns the first active manager whose role
+    // matches targetRole. Pure lookup: it does not mutate any shared state, so it can be called
+    // again for a fallback role (DM -> VP) without poisoning the later search.
+    private async Task<User?> FindApproverByRoleAsync(User startFrom, ApproverRole targetRole)
     {
         var current = startFrom;
+        var visited = new HashSet<int> { startFrom.UserId };
 
         while (current.LineManagerId.HasValue)
         {
-            var manager = await _db.Users.AsNoTracking().SingleOrDefaultAsync(u => u.UserId == current.LineManagerId.Value && u.IsActive);
+            var manager = await _db.Users.AsNoTracking()
+                .SingleOrDefaultAsync(u => u.UserId == current.LineManagerId.Value && u.IsActive);
             if (manager is null)
             {
                 return null;
             }
 
-            current = manager;
-            if (!usedUserIds.Add(manager.UserId))
+            if (!visited.Add(manager.UserId))
             {
-                return null;
+                return null; // cycle guard
             }
+
+            current = manager;
 
             if (GetApproverRole(manager.PositionEN) == targetRole)
             {

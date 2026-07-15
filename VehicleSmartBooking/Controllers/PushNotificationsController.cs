@@ -131,12 +131,14 @@ public class PushNotificationsController : Controller
 
         if (_webPush.IsEnabled)
         {
-            await _webPush.SendToUserAsync(user.UserId, title, message, url);
+            var sent = await _webPush.SendToUserAsync(user.UserId, title, message, url);
             return Json(new
             {
                 success = true,
-                pushSent = true,
-                message = "ส่งการทดสอบแจ้งเตือนแล้ว กรุณาตรวจสอบโทรศัพท์"
+                pushSent = sent > 0,
+                message = sent > 0
+                    ? "ส่งการทดสอบแจ้งเตือนแล้ว กรุณาตรวจสอบโทรศัพท์"
+                    : "บันทึกการแจ้งเตือนในระบบแล้ว แต่ยังไม่พบอุปกรณ์ที่เปิดรับ push หรือส่งไม่สำเร็จ กรุณากดเปิดการแจ้งเตือนบนมือถืออีกครั้ง"
             });
         }
 

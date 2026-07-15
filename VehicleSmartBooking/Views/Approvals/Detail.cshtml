@@ -465,7 +465,7 @@ else
                         <div class="d-flex flex-wrap gap-2">
                             @foreach (var a in Model.Attachments)
                             {
-                                <a href="@a.StoragePath" target="_blank" class="vb-attachment-link">
+                                <a href="@(Url.Content("~" + a.StoragePath))" target="_blank" class="vb-attachment-link">
                                     <i class="bi bi-paperclip"></i>
                                     <span>@a.FileName</span>
                                 </a>
@@ -596,8 +596,8 @@ else
                                 <div class="d-flex flex-wrap gap-2">
                                     @foreach (var photo in groupPhotos)
                                     {
-                                        <a href="@photo.RelativePath" target="_blank" title="@photo.OriginalFileName">
-                                            <img src="@photo.RelativePath"
+                                        <a href="@(Url.Content("~" + photo.RelativePath))" target="_blank" title="@photo.OriginalFileName">
+                                            <img src="@(Url.Content("~" + photo.RelativePath))"
                                                  alt="@photo.OriginalFileName"
                                                  class="vb-completion-photo" />
                                         </a>

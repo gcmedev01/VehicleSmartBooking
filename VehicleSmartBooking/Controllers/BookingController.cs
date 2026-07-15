@@ -98,9 +98,7 @@ namespace VehicleSmartBooking.Controllers
                 .AsNoTracking()
                 .Include(b => b.Requester)
                 .Where(b =>
-                    b.RequesterUserId == userId ||
-                    b.AssignedDriverId == userId ||
-                    b.Approvals.Any(a => a.ApproverUserId == userId))
+                    b.RequesterUserId == userId)
                 .OrderByDescending(b => b.StartAtUtc)
                 .ToListAsync();
 
@@ -225,9 +223,7 @@ namespace VehicleSmartBooking.Controllers
             ViewData["ActiveNav"] = "MyRequest";
             if (!ModelState.IsValid) return View(model);
 
-            var tripType = model.BookingMode?.ToLower() == "out"
-                ? TripType.OutProvince
-                : TripType.InProvince;
+            var tripType = model.BookingMode?.ToLower() == "out" ? TripType.OutProvince : TripType.InProvince;
 
             var vehicleType = (model.VehicleType ?? "").ToLower() switch
             {
@@ -251,9 +247,27 @@ namespace VehicleSmartBooking.Controllers
 
             var startUtc = DateTime.SpecifyKind(startLocal, DateTimeKind.Local).ToUniversalTime();
             var endUtc = DateTime.SpecifyKind(endLocal, DateTimeKind.Local).ToUniversalTime();
+            if (startUtc < DateTime.UtcNow)
+            {
+                ModelState.AddModelError("", "ไม่สามารถเลือกวันเวลาเริ่มต้นย้อนหลังได้");
+                return View(model);
+            }
             if (endUtc <= startUtc)
             {
-                ModelState.AddModelError("", "End must be after start");
+                ModelState.AddModelError("", "วันและเวลาสิ้นสุดไม่สามารถอยู่ก่อนวันและเวลาเริ่มต้น");
+                return View(model);
+            }
+
+            // Electric vehicles cannot be booked across calendar days (judged by date, not 24h).
+            if (isElectricVehicle && startLocal.Date != endLocal.Date)
+            {
+                ModelState.AddModelError("", "รถไฟฟ้าไม่สามารถจองเกิน 1 วัน");
+                return View(model);
+            }
+
+            if (tripType == TripType.OutProvince && (Attachments is null || Attachments.Count == 0 || Attachments.All(f => f.Length == 0)))
+            {
+                ModelState.AddModelError("", "กรุณาแนบเอกสารเพิ่มเติม (รายชื่อคนที่ไป, แผนที่)");
                 return View(model);
             }
 
@@ -715,6 +729,10 @@ namespace VehicleSmartBooking.Controllers
                 })
             );
 
+            // approver chain created -> booking now waits for approval decision
+            bookingForApproval.Status = BookingStatus.WaitingApproval;
+            bookingForApproval.UpdatedAtUtc = now;
+
             await _db.SaveChangesAsync();
         }
 
@@ -788,7 +806,13 @@ namespace VehicleSmartBooking.Controllers
 
         [Authorize]
         [HttpGet("/booking/preview-approvals")]
-        public async Task<IActionResult> PreviewApprovals([FromQuery] string? bookingMode, [FromQuery] string? vehicleType, [FromQuery] string? specialOccasionType)
+        public async Task<IActionResult> PreviewApprovals(
+            [FromQuery] string? bookingMode,
+            [FromQuery] string? vehicleType,
+            [FromQuery] string? specialOccasionType,
+            [FromQuery] string? serviceOption,
+            [FromQuery] string? startAt,
+            [FromQuery] string? endAt)
         {
             var userCode = User.FindFirstValue(ClaimTypes.NameIdentifier);
             if (string.IsNullOrWhiteSpace(userCode)) return Json(new { ok = false, message = "Unauthenticated" });
@@ -808,12 +832,28 @@ namespace VehicleSmartBooking.Controllers
 
             var special = ParseSpecialOccasionType(specialOccasionType, tripType);
 
+            // Mirrors the exact same rule used by the real Create action: personal-vehicle only
+            // applies to out-of-province requests.
+            var usePersonal = string.Equals(serviceOption?.Trim(), "personal", StringComparison.OrdinalIgnoreCase)
+                              && tripType == TripType.OutProvince;
+
+            // Electric single-day vs multi-day depends on the actual selected dates. If either is
+            // missing/unparseable, fall back to same-day (ElectricSingleDay) rather than guessing —
+            // this only matters once both dates are chosen, which the client only calls us for.
+            // Parsed the same way (plain DateTime.TryParse) as the real Create POST action.
+            var startParsed = DateTime.TryParse(startAt, out var startLocal);
+            var endParsed = DateTime.TryParse(endAt, out var endLocal);
+            var startUtc = startParsed ? DateTime.SpecifyKind(startLocal, DateTimeKind.Local).ToUniversalTime() : DateTime.UtcNow;
+            var endUtc = endParsed ? DateTime.SpecifyKind(endLocal, DateTimeKind.Local).ToUniversalTime() : startUtc;
+
             var bookingStub = new Booking
             {
                 TripType = tripType,
                 VehicleTypeRequested = vType,
                 SpecialOccasionType = special,
-                IsPersonal = false
+                IsPersonal = usePersonal,
+                StartAtUtc = startUtc,
+                EndAtUtc = endUtc
             };
 
             var scenario = DetermineApprovalScenario(bookingStub);
